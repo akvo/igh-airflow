@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.sensors.external_task import ExternalTaskSensor
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
