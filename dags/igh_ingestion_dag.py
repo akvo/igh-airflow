@@ -1,50 +1,49 @@
 """IGH Ingestion DAG - Syncs data from Microsoft Dataverse to Bronze database."""
 
+import logging
+import os
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 
-# Add project paths for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+logger = logging.getLogger(__name__)
 
-from config.settings import config
-from utils.slack_alerts import send_failure_alert, send_success_alert
+# Import utilities
+sys.path.insert(0, "/opt/airflow")
+from utils.slack_alerts import send_failure_alert  # noqa: E402
 
 default_args = {
     "owner": "igh",
     "depends_on_past": False,
-    "retries": config.retries,
-    "retry_delay": config.retry_delay,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
     "on_failure_callback": send_failure_alert,
 }
 
+# Get schedule from environment variable with default
+INGESTION_SCHEDULE = os.environ.get("INGESTION_SCHEDULE", "0 2 * * *")
 
-def run_dataverse_sync(**context):
-    """Execute Dataverse sync to Bronze database.
 
-    This function will call the igh-data-sync library when available.
-    For now, it provides a placeholder implementation.
-    """
-    import logging
+def sync_dataverse(**context):
+    """Placeholder sync function - replace with actual igh-data-sync implementation."""
+    from pathlib import Path
 
-    logger = logging.getLogger(__name__)
+    logger.info("Starting Dataverse sync...")
 
-    bronze_db_path = config.bronze_db_path
-    logger.info(f"Starting Dataverse sync to {bronze_db_path}")
+    # Ensure bronze directory exists
+    bronze_dir = Path("/opt/airflow/data/bronze")
+    bronze_dir.mkdir(parents=True, exist_ok=True)
 
-    # TODO: Replace with actual sync call when igh-data-sync is available
+    # Placeholder: actual sync would happen here
     # from igh_data_sync import run_sync
-    # run_sync(db_path=bronze_db_path)
+    # run_sync()
 
-    # Placeholder - ensure directory exists
-    db_path = Path(bronze_db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Placeholder: igh-data-sync would run here")
+    logger.info("Sync completed at %s", datetime.now())
 
-    logger.info("Dataverse sync completed successfully")
-    return {"status": "success", "db_path": str(bronze_db_path)}
+    return {"status": "success", "records_synced": 0}
 
 
 with DAG(
@@ -52,13 +51,12 @@ with DAG(
     description="Sync data from Microsoft Dataverse to Bronze SQLite database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=config.ingestion_schedule,
+    schedule=INGESTION_SCHEDULE,
     catchup=False,
     tags=["igh", "ingestion", "dataverse"],
-    on_success_callback=send_success_alert,
 ) as dag:
     sync_task = PythonOperator(
         task_id="sync_dataverse",
-        python_callable=run_dataverse_sync,
+        python_callable=sync_dataverse,
         execution_timeout=timedelta(hours=2),
     )

@@ -5,9 +5,13 @@ description = "Apache Airflow orchestration for the IGH Data Pipeline"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "apache-airflow>=2.8.0",
-    "apache-airflow-providers-slack>=8.0.0",
+    "apache-airflow>=3.1.0",
+    "apache-airflow-providers-slack>=9.0.0",
+    "apache-airflow-providers-fab>=2.0.0",
+    "apache-airflow-providers-celery>=3.0.0",
     "requests>=2.31.0",
+    "psycopg2-binary>=2.9.0",
+    "asyncpg>=0.29.0",
 ]
 
 [dependency-groups]
