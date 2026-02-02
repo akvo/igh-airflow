@@ -57,10 +57,10 @@ docker compose up -d
 docker compose logs -f
 
 # Access shell
-docker compose exec airflow-webserver bash
+docker compose exec airflow-apiserver bash
 
 # List DAGs
-docker compose exec airflow-webserver airflow dags list
+docker compose exec airflow-apiserver airflow dags list
 
 # Stop Airflow
 docker compose down
@@ -157,5 +157,5 @@ uv run pytest tests/ -v
 ### Debugging DAG Issues
 
 1. Check Airflow logs: `docker compose logs airflow-scheduler`
-2. List DAGs: `docker compose exec airflow-webserver airflow dags list`
-3. Test DAG loading: `docker compose exec airflow-webserver python -c "from dags.igh_ingestion_dag import dag; print(dag)"`
+2. List DAGs: `docker compose exec airflow-apiserver airflow dags list`
+3. Test DAG loading: `docker compose exec airflow-apiserver python -c "from dags.igh_ingestion_dag import dag; print(dag)"`

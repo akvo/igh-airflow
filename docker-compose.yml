@@ -6,7 +6,10 @@
 #
 ---
 x-airflow-common: &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.0}
+  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.6}
+  env_file:
+    - path: ${ENV_FILE_PATH:-.env}
+      required: false
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
@@ -52,7 +55,8 @@ services:
     restart: always
 
   redis:
-    image: redis:7
+    # Using 7.2-bookworm as Redis switched to SSPL license after 7.2
+    image: redis:7.2-bookworm
     command: redis-server --requirepass ${REDIS_PASSWORD:-redispass}
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
@@ -191,6 +195,8 @@ services:
       - bash
       - -c
       - airflow
+    depends_on:
+      <<: *airflow-common-depends-on
 
   flower:
     <<: *airflow-common
