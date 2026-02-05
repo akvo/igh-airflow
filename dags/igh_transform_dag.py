@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from airflow import DAG
-from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 
 # Add project paths for imports
@@ -21,6 +21,59 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
     "on_failure_callback": send_failure_alert,
 }
+
+
+def run_bronze_to_silver(**context):
+    """Transform Bronze layer to Silver layer using igh-data-transform."""
+    import logging
+
+    from igh_data_transform import bronze_to_silver
+
+    logger = logging.getLogger(__name__)
+
+    bronze_path = Path(config.bronze_db_path)
+    silver_path = Path(config.silver_db_path)
+
+    # Ensure output directory exists
+    silver_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Starting Bronze to Silver transformation")
+    logger.info("Source: %s", bronze_path)
+    logger.info("Target: %s", silver_path)
+
+    success = bronze_to_silver(
+        bronze_db_path=str(bronze_path),
+        silver_db_path=str(silver_path),
+    )
+
+    if not success:
+        raise RuntimeError("Bronze to Silver transformation failed")
+
+    logger.info("Bronze to Silver transformation completed successfully")
+    return {"status": "success", "source": str(bronze_path), "target": str(silver_path)}
+
+
+def run_silver_to_gold(**context):
+    """Transform Silver layer to Gold layer using igh-data-transform."""
+    import logging
+
+    from igh_data_transform import silver_to_gold
+
+    logger = logging.getLogger(__name__)
+
+    silver_path = Path(config.silver_db_path)
+
+    logger.info("Starting Silver to Gold transformation")
+    logger.info("Source: %s", silver_path)
+
+    # Note: silver_to_gold is currently a stub in igh-data-transform
+    success = silver_to_gold(silver_db_path=str(silver_path))
+
+    if not success:
+        raise RuntimeError("Silver to Gold transformation failed")
+
+    logger.info("Silver to Gold transformation completed successfully")
+    return {"status": "success", "source": str(silver_path)}
 
 
 with DAG(
@@ -44,31 +97,17 @@ with DAG(
     )
 
     # Transform Bronze to Silver
-    # TODO: Replace with actual igh-transform CLI when available
-    bronze_to_silver = BashOperator(
+    bronze_to_silver_task = PythonOperator(
         task_id="bronze_to_silver",
-        bash_command=f"""
-            echo "Transforming Bronze to Silver..."
-            echo "Bronze DB: {config.bronze_db_path}"
-            echo "Silver DB: {config.silver_db_path}"
-            mkdir -p $(dirname {config.silver_db_path})
-            # igh-transform bronze-to-silver --source {config.bronze_db_path} --target {config.silver_db_path}
-            echo "Bronze to Silver transformation complete"
-        """,
+        python_callable=run_bronze_to_silver,
         execution_timeout=timedelta(hours=1),
     )
 
     # Transform Silver to Gold
-    # TODO: Replace with actual igh-transform CLI when available
-    silver_to_gold = BashOperator(
+    silver_to_gold_task = PythonOperator(
         task_id="silver_to_gold",
-        bash_command=f"""
-            echo "Transforming Silver to Gold..."
-            echo "Silver DB: {config.silver_db_path}"
-            # igh-transform silver-to-gold --source {config.silver_db_path}
-            echo "Silver to Gold transformation complete"
-        """,
+        python_callable=run_silver_to_gold,
         execution_timeout=timedelta(hours=1),
     )
 
-    wait_for_ingestion >> bronze_to_silver >> silver_to_gold
+    wait_for_ingestion >> bronze_to_silver_task >> silver_to_gold_task

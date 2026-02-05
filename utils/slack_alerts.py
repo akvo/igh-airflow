@@ -61,9 +61,5 @@ def send_success_alert(context: dict[str, Any]) -> None:
     dag_id = context.get("dag").dag_id if context.get("dag") else "unknown"
     execution_date = context.get("execution_date", "unknown")
 
-    message = (
-        f":large_green_circle: *DAG Completed Successfully*\n"
-        f"*DAG:* {dag_id}\n"
-        f"*Execution Date:* {execution_date}"
-    )
+    message = f":large_green_circle: *DAG Completed Successfully*\n*DAG:* {dag_id}\n*Execution Date:* {execution_date}"
     send_slack_message(message)

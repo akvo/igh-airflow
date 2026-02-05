@@ -24,9 +24,15 @@ class PipelineConfig:
     """Configuration for IGH data pipeline."""
 
     # Database paths
-    bronze_db_path: str = field(default_factory=lambda: get_env("BRONZE_DB_PATH", "/opt/airflow/data/bronze/dataverse.db"))
-    silver_db_path: str = field(default_factory=lambda: get_env("SILVER_DB_PATH", "/opt/airflow/data/silver/igh_silver.db"))
-    production_db_path: str = field(default_factory=lambda: get_env("PRODUCTION_DB_PATH", "/opt/airflow/data/production/igh.db"))
+    bronze_db_path: str = field(
+        default_factory=lambda: get_env("BRONZE_DB_PATH", "/opt/airflow/data/bronze/dataverse.db")
+    )
+    silver_db_path: str = field(
+        default_factory=lambda: get_env("SILVER_DB_PATH", "/opt/airflow/data/silver/igh_silver.db")
+    )
+    production_db_path: str = field(
+        default_factory=lambda: get_env("PRODUCTION_DB_PATH", "/opt/airflow/data/production/igh.db")
+    )
 
     # Retry configuration
     retries: int = 2
