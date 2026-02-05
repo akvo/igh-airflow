@@ -1,12 +1,16 @@
 # Airflow 3.1.6 with CeleryExecutor for IGH Data Pipeline
 #
 # Usage:
-#   docker compose up -d
+#   docker compose up -d          # Builds custom image and starts services
+#   docker compose build --no-cache  # Force rebuild the image
 #   Access UI at http://localhost:8080 (airflow/airflow)
 #
 ---
 x-airflow-common: &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.6}
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  image: ${AIRFLOW_IMAGE_NAME:-igh-airflow:latest}
   env_file:
     - path: ${ENV_FILE_PATH:-.env}
       required: false
@@ -18,6 +22,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CELERY__BROKER_URL: redis://:${REDIS_PASSWORD:-redispass}@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-}
     AIRFLOW__API__SECRET_KEY: ${AIRFLOW__API__SECRET_KEY:-}
+    AIRFLOW__API_AUTH__JWT_ISSUER: airflow
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -76,7 +81,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 120s
     restart: always
     depends_on:
       <<: *airflow-common-depends-on

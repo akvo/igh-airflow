@@ -1,14 +1,14 @@
 """IGH Ingestion DAG - Syncs data from Microsoft Dataverse to Bronze database."""
 
+import asyncio
 import logging
 import os
 import sys
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.providers.standard.operators.python import PythonOperator
-
-logger = logging.getLogger(__name__)
 
 # Import utilities
 sys.path.insert(0, "/opt/airflow")
@@ -25,25 +25,66 @@ default_args = {
 # Get schedule from environment variable with default
 INGESTION_SCHEDULE = os.environ.get("INGESTION_SCHEDULE", "0 2 * * *")
 
+logger = logging.getLogger(__name__)
+
+
+def get_env_or_variable(key: str, default: str | None = None) -> str:
+    """Get value from environment variable, falling back to Airflow Variable."""
+    value = os.environ.get(key)
+    if value:
+        return value
+    try:
+        return Variable.get(key, default_var=default)
+    except Exception:
+        if default is not None:
+            return default
+        raise
+
 
 def sync_dataverse(**context):
-    """Placeholder sync function - replace with actual igh-data-sync implementation."""
+    """Sync data from Microsoft Dataverse to Bronze SQLite database using igh-data-sync."""
     from pathlib import Path
+
+    from igh_data_sync import run_sync
+    from igh_data_sync.config import Config
 
     logger.info("Starting Dataverse sync...")
 
+    # Get database path from environment
+    bronze_db_path = get_env_or_variable(
+        "BRONZE_DB_PATH", "/opt/airflow/data/bronze/dataverse.db"
+    )
+
     # Ensure bronze directory exists
-    bronze_dir = Path("/opt/airflow/data/bronze")
+    bronze_dir = Path(bronze_db_path).parent
     bronze_dir.mkdir(parents=True, exist_ok=True)
 
-    # Placeholder: actual sync would happen here
-    # from igh_data_sync import run_sync
-    # run_sync()
+    # Build config from environment variables (with Airflow Variable fallback)
+    config = Config(
+        api_url=get_env_or_variable("DATAVERSE_API_URL"),
+        client_id=get_env_or_variable("DATAVERSE_CLIENT_ID"),
+        client_secret=get_env_or_variable("DATAVERSE_CLIENT_SECRET"),
+        scope=get_env_or_variable("DATAVERSE_SCOPE"),
+        sqlite_db_path=bronze_db_path,
+    )
 
-    logger.info("Placeholder: igh-data-sync would run here")
-    logger.info("Sync completed at %s", datetime.now())
+    logger.info("Syncing to database: %s", bronze_db_path)
 
-    return {"status": "success", "records_synced": 0}
+    # Run async sync function
+    success = asyncio.run(
+        run_sync(
+            config=config,
+            verify_reference=False,
+            logger=logger,
+        )
+    )
+
+    if not success:
+        raise RuntimeError("Dataverse sync failed - check logs for details")
+
+    logger.info("Sync completed successfully at %s", datetime.now())
+
+    return {"status": "success", "database": bronze_db_path}
 
 
 with DAG(

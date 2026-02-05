@@ -1,4 +1,4 @@
-FROM apache/airflow:3.1.0-python3.11
+FROM apache/airflow:3.1.6-python3.11
 
 USER root
 
@@ -13,7 +13,7 @@ COPY --chown=airflow:root pyproject.toml uv.lock /opt/airflow/
 WORKDIR /opt/airflow
 
 # Export requirements as root (uv needs to read the files)
-RUN uv export --frozen --no-dev --no-emit-project > requirements.txt \
+RUN uv export --frozen --no-dev --no-emit-project --no-hashes > requirements.txt \
     && chown airflow:root requirements.txt
 
 # Switch to airflow user and install packages
