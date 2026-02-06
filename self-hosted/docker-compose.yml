@@ -7,17 +7,17 @@
 #   cp .env.example .env  # Edit with production values
 #
 # Usage:
-#   docker compose -f docker-compose.production.yaml up -d
-#   docker compose -f docker-compose.production.yaml logs -f
-#   docker compose -f docker-compose.production.yaml ps
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose ps
 #
 # With Flower (Celery monitoring):
-#   docker compose -f docker-compose.production.yaml --profile flower up -d
+#   docker compose --profile flower up -d
 #
 ---
 x-airflow-common: &airflow-common
   build:
-    context: .
+    context: ..
     dockerfile: docker/Dockerfile
   image: ${AIRFLOW_IMAGE_NAME}
   environment: &airflow-common-env
