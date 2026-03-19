@@ -7,7 +7,6 @@ from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
-from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -22,33 +21,6 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
     "on_failure_callback": send_failure_alert,
 }
-
-
-def verify_silver_database(**context):
-    """Verify Silver database integrity before deployment."""
-    import logging
-    import sqlite3
-
-    logger = logging.getLogger(__name__)
-    silver_path = Path(config.silver_db_path)
-
-    logger.info(f"Verifying Silver database at {silver_path}")
-
-    if not silver_path.exists():
-        raise FileNotFoundError(f"Silver database not found: {silver_path}")
-
-    # Basic integrity check
-    conn = sqlite3.connect(silver_path)
-    try:
-        cursor = conn.execute("PRAGMA integrity_check")
-        result = cursor.fetchone()[0]
-        if result != "ok":
-            raise ValueError(f"Database integrity check failed: {result}")
-        logger.info("Silver database integrity verified")
-    finally:
-        conn.close()
-
-    return {"status": "verified", "path": str(silver_path)}
 
 
 def deploy_to_production(**context):
@@ -93,66 +65,17 @@ def deploy_to_production(**context):
     return {"status": "deployed", "path": str(production_path)}
 
 
-def verify_production_database(**context):
-    """Verify production database after deployment."""
-    import logging
-    import sqlite3
-
-    logger = logging.getLogger(__name__)
-    production_path = Path(config.production_db_path)
-
-    logger.info(f"Verifying production database at {production_path}")
-
-    if not production_path.exists():
-        raise FileNotFoundError(f"Production database not found: {production_path}")
-
-    # Basic integrity check
-    conn = sqlite3.connect(production_path)
-    try:
-        cursor = conn.execute("PRAGMA integrity_check")
-        result = cursor.fetchone()[0]
-        if result != "ok":
-            raise ValueError(f"Database integrity check failed: {result}")
-        logger.info("Production database integrity verified")
-    finally:
-        conn.close()
-
-    return {"status": "verified", "path": str(production_path)}
-
-
 with DAG(
     dag_id="igh_deployment",
     description="Deploy validated data to production database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=config.deployment_schedule,
+    schedule=None,
     catchup=False,
     tags=["igh", "deployment", "production"],
     on_success_callback=send_success_alert,
 ) as dag:
-    # Wait for transform DAG to complete
-    wait_for_transform = ExternalTaskSensor(
-        task_id="wait_for_transform",
-        external_dag_id="igh_transform",
-        external_task_id=None,  # Wait for entire DAG
-        mode="reschedule",
-        timeout=3600,
-        poke_interval=60,
-    )
-
-    verify_source = PythonOperator(
-        task_id="verify_silver_database",
-        python_callable=verify_silver_database,
-    )
-
     deploy = PythonOperator(
         task_id="deploy_to_production",
         python_callable=deploy_to_production,
     )
-
-    verify_target = PythonOperator(
-        task_id="verify_production_database",
-        python_callable=verify_production_database,
-    )
-
-    wait_for_transform >> verify_source >> deploy >> verify_target

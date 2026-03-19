@@ -38,11 +38,6 @@ class PipelineConfig:
     retries: int = 2
     retry_delay: timedelta = field(default_factory=lambda: timedelta(minutes=5))
 
-    # Default schedules (can be overridden via Airflow Variables)
-    ingestion_schedule: str = field(default_factory=lambda: get_env("INGESTION_SCHEDULE", "0 2 * * *"))
-    transform_schedule: str = field(default_factory=lambda: get_env("TRANSFORM_SCHEDULE", "0 4 * * *"))
-    deployment_schedule: str = field(default_factory=lambda: get_env("DEPLOYMENT_SCHEDULE", "0 6 * * *"))
-
 
 # Singleton instance for easy import
 config = PipelineConfig()

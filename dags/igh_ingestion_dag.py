@@ -71,7 +71,7 @@ with DAG(
     description="Sync data from Microsoft Dataverse to Bronze SQLite database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=config.ingestion_schedule,
+    schedule=None,
     catchup=False,
     tags=["igh", "ingestion", "dataverse"],
 ) as dag:

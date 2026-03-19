@@ -76,20 +76,18 @@ docker compose --profile flower up -d
 
 ### DAG Pipeline
 
+All DAGs are manual-trigger only — no schedules, no cross-DAG triggers.
+
 ```
-igh_ingestion (02:00 daily)
+igh_ingestion (manual only)
     └── sync_dataverse
-            ↓
-igh_transform (04:00 daily)
-    ├── wait_for_ingestion (ExternalTaskSensor)
+
+igh_transform (manual only)
     ├── bronze_to_silver
     └── silver_to_gold
-            ↓
-igh_deployment (06:00 daily)
-    ├── wait_for_transform (ExternalTaskSensor)
-    ├── verify_silver_database
-    ├── deploy_to_production
-    └── verify_production_database
+
+igh_deployment (manual only)
+    └── deploy_to_production
 ```
 
 ### Project Structure
@@ -139,9 +137,6 @@ igh-airflow/
 | `BRONZE_DB_PATH` | Bronze database location | `/opt/airflow/data/bronze/dataverse.db` |
 | `SILVER_DB_PATH` | Silver database location | `/opt/airflow/data/silver/igh_silver.db` |
 | `PRODUCTION_DB_PATH` | Production database location | `/opt/airflow/data/production/igh.db` |
-| `INGESTION_SCHEDULE` | Cron schedule for ingestion | `0 2 * * *` |
-| `TRANSFORM_SCHEDULE` | Cron schedule for transform | `0 4 * * *` |
-| `DEPLOYMENT_SCHEDULE` | Cron schedule for deployment | `0 6 * * *` |
 | `DATAVERSE_API_URL` | Dataverse API endpoint URL | - |
 | `DATAVERSE_CLIENT_ID` | OAuth client ID | - |
 | `DATAVERSE_CLIENT_SECRET` | OAuth client secret | - |

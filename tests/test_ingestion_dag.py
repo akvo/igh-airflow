@@ -17,6 +17,13 @@ def test_dag_has_correct_tags():
     assert "ingestion" in dag.tags
 
 
+def test_dag_is_manual_only():
+    """Test that the DAG has no schedule (manual trigger only)."""
+    from dags.igh_ingestion_dag import dag
+
+    assert dag.schedule is None
+
+
 def test_dag_has_tasks():
     """Test that the DAG has the expected tasks."""
     from dags.igh_ingestion_dag import dag

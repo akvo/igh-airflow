@@ -1,12 +1,12 @@
 """IGH Transform DAG - Transforms data from Bronze to Silver and Gold layers."""
 
+import logging
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
-from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -22,14 +22,12 @@ default_args = {
     "on_failure_callback": send_failure_alert,
 }
 
+logger = logging.getLogger(__name__)
+
 
 def run_bronze_to_silver(**context):
     """Transform Bronze layer to Silver layer using igh-data-transform."""
-    import logging
-
     from igh_data_transform import bronze_to_silver
-
-    logger = logging.getLogger(__name__)
 
     bronze_path = Path(config.bronze_db_path)
     silver_path = Path(config.silver_db_path)
@@ -55,11 +53,7 @@ def run_bronze_to_silver(**context):
 
 def run_silver_to_gold(**context):
     """Transform Silver layer to Gold layer using igh-data-transform."""
-    import logging
-
     from igh_data_transform import silver_to_gold
-
-    logger = logging.getLogger(__name__)
 
     silver_path = Path(config.silver_db_path)
 
@@ -81,33 +75,21 @@ with DAG(
     description="Transform data from Bronze to Silver and Gold layers",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=config.transform_schedule,
+    schedule=None,
     catchup=False,
     tags=["igh", "transform", "silver", "gold"],
     on_success_callback=send_success_alert,
 ) as dag:
-    # Wait for ingestion DAG to complete
-    wait_for_ingestion = ExternalTaskSensor(
-        task_id="wait_for_ingestion",
-        external_dag_id="igh_ingestion",
-        external_task_id=None,  # Wait for entire DAG
-        mode="reschedule",
-        timeout=3600,
-        poke_interval=60,
-    )
-
-    # Transform Bronze to Silver
     bronze_to_silver_task = PythonOperator(
         task_id="bronze_to_silver",
         python_callable=run_bronze_to_silver,
         execution_timeout=timedelta(hours=1),
     )
 
-    # Transform Silver to Gold
     silver_to_gold_task = PythonOperator(
         task_id="silver_to_gold",
         python_callable=run_silver_to_gold,
         execution_timeout=timedelta(hours=1),
     )
 
-    wait_for_ingestion >> bronze_to_silver_task >> silver_to_gold_task
+    bronze_to_silver_task >> silver_to_gold_task
