@@ -68,6 +68,7 @@ def sync_dataverse(**context):
 
 with DAG(
     dag_id="igh_ingestion",
+    dag_display_name="1. IGH Ingestion",
     description="Sync data from Microsoft Dataverse to Bronze SQLite database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),

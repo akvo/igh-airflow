@@ -67,6 +67,7 @@ def deploy_to_production(**context):
 
 with DAG(
     dag_id="igh_deployment",
+    dag_display_name="3. IGH Deployment",
     description="Deploy validated data to production database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),

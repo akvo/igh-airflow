@@ -72,6 +72,7 @@ def run_silver_to_gold(**context):
 
 with DAG(
     dag_id="igh_transform",
+    dag_display_name="2. IGH Transform",
     description="Transform data from Bronze to Silver and Gold layers",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
