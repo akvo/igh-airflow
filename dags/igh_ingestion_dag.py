@@ -13,14 +13,12 @@ from airflow.providers.standard.operators.python import PythonOperator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import config, get_env
-from utils.slack_alerts import send_failure_alert
 
 default_args = {
     "owner": "igh",
     "depends_on_past": False,
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "on_failure_callback": send_failure_alert,
 }
 
 logger = logging.getLogger(__name__)

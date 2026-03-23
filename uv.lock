@@ -391,22 +391,6 @@ wheels = [
 ]
 
 [[package]]
-name = "apache-airflow-providers-slack"
-version = "9.6.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "apache-airflow" },
-    { name = "apache-airflow-providers-common-compat" },
-    { name = "apache-airflow-providers-common-sql" },
-    { name = "asgiref" },
-    { name = "slack-sdk" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/01/bc/ceef46b5e33e52e0fd7cb562fde1663137af7bf893fbe2ce5b85957d4be7/apache_airflow_providers_slack-9.6.2.tar.gz", hash = "sha256:6cc341f4fcc8ec38f93c2771b94c736fe7b2d9bae36d876f18b5ec66170f18a5", size = 62715, upload-time = "2026-01-17T10:49:21.183Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/8e/f25b5ac9c4b3de1509d41da1c6f3c10e9f0ccbacb8bc93bf20fb63e81f79/apache_airflow_providers_slack-9.6.2-py3-none-any.whl", hash = "sha256:8c8de8a4c65034023b5aef65e04449d9eea982be65f2a90dec8764ec58c72932", size = 42313, upload-time = "2026-01-17T10:47:38.379Z" },
-]
-
-[[package]]
 name = "apache-airflow-providers-smtp"
 version = "2.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1676,13 +1660,11 @@ dependencies = [
     { name = "apache-airflow" },
     { name = "apache-airflow-providers-celery" },
     { name = "apache-airflow-providers-fab" },
-    { name = "apache-airflow-providers-slack" },
     { name = "asyncpg" },
     { name = "igh-data-sync" },
     { name = "igh-data-transform" },
     { name = "psycopg2-binary" },
     { name = "redis" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -1698,13 +1680,11 @@ requires-dist = [
     { name = "apache-airflow", specifier = ">=3.1.0" },
     { name = "apache-airflow-providers-celery", specifier = ">=3.0.0" },
     { name = "apache-airflow-providers-fab", specifier = ">=2.0.0" },
-    { name = "apache-airflow-providers-slack", specifier = ">=9.0.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "igh-data-sync", git = "https://github.com/akvo/igh-data-sync.git" },
     { name = "igh-data-transform", git = "https://github.com/akvo/igh-data-transform.git" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
-    { name = "requests", specifier = ">=2.31.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -3572,15 +3552,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "slack-sdk"
-version = "3.39.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b6/dd/645f3eb93fce38eadbb649e85684730b1fc3906c2674ca59bddc2ca2bd2e/slack_sdk-3.39.0.tar.gz", hash = "sha256:6a56be10dc155c436ff658c6b776e1c082e29eae6a771fccf8b0a235822bbcb1", size = 247207, upload-time = "2025-11-20T15:27:57.556Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/1f/32bcf088e535c1870b1a1f2e3b916129c66fdfe565a793316317241d41e5/slack_sdk-3.39.0-py2.py3-none-any.whl", hash = "sha256:b1556b2f5b8b12b94e5ea3f56c4f2c7f04462e4e1013d325c5764ff118044fa8", size = 309850, upload-time = "2025-11-20T15:27:55.729Z" },
 ]
 
 [[package]]

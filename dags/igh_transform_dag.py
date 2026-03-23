@@ -12,14 +12,12 @@ from airflow.providers.standard.operators.python import PythonOperator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import config
-from utils.slack_alerts import send_failure_alert, send_success_alert
 
 default_args = {
     "owner": "igh",
     "depends_on_past": False,
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
-    "on_failure_callback": send_failure_alert,
 }
 
 logger = logging.getLogger(__name__)
@@ -79,7 +77,6 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["igh", "transform", "silver", "gold"],
-    on_success_callback=send_success_alert,
 ) as dag:
     bronze_to_silver_task = PythonOperator(
         task_id="bronze_to_silver",

@@ -6,11 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "apache-airflow>=3.1.0",
-    "apache-airflow-providers-slack>=9.0.0",
     "apache-airflow-providers-fab>=2.0.0",
     "apache-airflow-providers-celery>=3.0.0",
     "redis>=5.0.0,<6.0.0",
-    "requests>=2.31.0",
     "psycopg2-binary>=2.9.0",
     "asyncpg>=0.29.0",
     "igh-data-sync",

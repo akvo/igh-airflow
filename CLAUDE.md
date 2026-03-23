@@ -101,7 +101,6 @@ igh-airflow/
 ├── config/                  # Configuration modules
 │   └── settings.py          # PipelineConfig dataclass
 ├── utils/                   # Utility functions
-│   └── slack_alerts.py      # Slack notifications
 ├── plugins/                 # Airflow plugins (empty)
 ├── data/                    # Data directories (bronze/silver/production)
 ├── logs/                    # Airflow logs
@@ -117,7 +116,6 @@ igh-airflow/
 ### Key Modules
 
 - **config/settings.py**: Centralized configuration with `PipelineConfig` dataclass. Uses `get_env()` to read from environment variables with fallback to Airflow Variables.
-- **utils/slack_alerts.py**: Slack webhook notifications with `send_failure_alert` and `send_success_alert` callbacks.
 - **dags/igh_ingestion_dag.py**: Uses `igh-data-sync` library to sync from Dataverse.
 
 ## Configuration
@@ -133,7 +131,6 @@ igh-airflow/
 | `_AIRFLOW_WWW_USER_PASSWORD` | Airflow UI password | `airflow` |
 | `AIRFLOW__CORE__FERNET_KEY` | Fernet encryption key | - |
 | `AIRFLOW__API__SECRET_KEY` | API secret key for JWT | - |
-| `SLACK_WEBHOOK_URL` | Slack webhook for alerts | - |
 | `BRONZE_DB_PATH` | Bronze database location | `/opt/airflow/data/bronze/dataverse.db` |
 | `SILVER_DB_PATH` | Silver database location | `/opt/airflow/data/silver/igh_silver.db` |
 | `PRODUCTION_DB_PATH` | Production database location | `/opt/airflow/data/production/igh.db` |
@@ -162,7 +159,6 @@ Airflow Variables are used as fallback when environment variables are not set:
 | `DATAVERSE_CLIENT_ID` | Fallback for OAuth client ID |
 | `DATAVERSE_CLIENT_SECRET` | Fallback for OAuth client secret |
 | `DATAVERSE_SCOPE` | Fallback for OAuth scope |
-| `slack_webhook_url` | Fallback for `SLACK_WEBHOOK_URL` env var |
 
 ## Testing
 

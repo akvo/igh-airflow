@@ -86,15 +86,13 @@ igh-airflow/
 │   ├── __init__.py
 │   └── settings.py             # PipelineConfig dataclass
 ├── utils/
-│   ├── __init__.py
-│   └── slack_alerts.py         # Slack notification helpers
+│   └── __init__.py
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py
 │   ├── test_ingestion_dag.py
 │   ├── test_transform_dag.py
-│   ├── test_deployment_dag.py
-│   └── test_slack_alerts.py
+│   └── test_deployment_dag.py
 ├── docker/
 │   ├── Dockerfile              # Production image
 │   └── entrypoint.sh
@@ -117,7 +115,6 @@ igh-airflow/
 | `BRONZE_DB_PATH` | `/opt/airflow/data/bronze/dataverse.db` | Bronze database path |
 | `SILVER_DB_PATH` | `/opt/airflow/data/silver/igh_silver.db` | Silver database path |
 | `PRODUCTION_DB_PATH` | `/opt/airflow/data/production/igh.db` | Production database path |
-| `SLACK_WEBHOOK_URL` | - | Slack webhook for alerts |
 | `INGESTION_SCHEDULE` | `0 2 * * *` | Ingestion cron schedule |
 | `TRANSFORM_SCHEDULE` | `0 4 * * *` | Transform cron schedule |
 | `DEPLOYMENT_SCHEDULE` | `0 6 * * *` | Deployment cron schedule |
@@ -129,7 +126,6 @@ Configure these in the Airflow UI (Admin → Connections):
 | Connection ID | Type | Fields |
 |--------------|------|--------|
 | `dataverse_api` | HTTP | Host: API URL, Login: Client ID, Password: Client Secret |
-| `slack_webhook` | Slack Webhook | Password: Webhook path |
 
 ### Airflow Variables
 
@@ -225,14 +221,6 @@ docker run -d \
   -v /data:/opt/airflow/data \
   igh-airflow:latest webserver
 ```
-
-## Alerts
-
-The pipeline sends Slack notifications on:
-- Task failures (with error details)
-- DAG completion (success notification)
-
-Configure `SLACK_WEBHOOK_URL` in your `.env` file or as an Airflow Variable.
 
 ## License
 
