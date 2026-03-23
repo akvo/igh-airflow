@@ -55,7 +55,7 @@ docker compose up -d
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   igh_ingestion │───▶│  igh_transform  │───▶│ igh_deployment  │
-│   (02:00 UTC)   │    │   (04:00 UTC)   │    │   (06:00 UTC)   │
+│  (manual only)  │    │  (manual only)  │    │  (manual only)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
         │                      │                      │
         ▼                      ▼                      ▼
@@ -65,11 +65,11 @@ docker compose up -d
 
 ### DAG Details
 
-| DAG | Schedule | Tasks | Description |
-|-----|----------|-------|-------------|
-| `igh_ingestion` | `0 2 * * *` | 1 | Sync Dataverse to Bronze DB |
-| `igh_transform` | `0 4 * * *` | 3 | Transform Bronze→Silver→Gold |
-| `igh_deployment` | `0 6 * * *` | 4 | Deploy to production with verification |
+| DAG | Tasks | Description |
+|-----|-------|-------------|
+| `igh_ingestion` | 1 | Sync Dataverse to Bronze DB |
+| `igh_transform` | 2 | Transform Bronze→Silver→Gold |
+| `igh_deployment` | 1 | Deploy to production with atomic swap |
 
 ## Project Structure
 
@@ -80,13 +80,9 @@ igh-airflow/
 │   ├── igh_ingestion_dag.py    # Dataverse sync
 │   ├── igh_transform_dag.py    # Bronze→Silver→Gold transforms
 │   └── igh_deployment_dag.py   # Production deployment
-├── plugins/
-│   └── __init__.py
 ├── config/
 │   ├── __init__.py
 │   └── settings.py             # PipelineConfig dataclass
-├── utils/
-│   └── __init__.py
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py
@@ -115,9 +111,6 @@ igh-airflow/
 | `BRONZE_DB_PATH` | `/opt/airflow/data/bronze/dataverse.db` | Bronze database path |
 | `SILVER_DB_PATH` | `/opt/airflow/data/silver/igh_silver.db` | Silver database path |
 | `PRODUCTION_DB_PATH` | `/opt/airflow/data/production/igh.db` | Production database path |
-| `INGESTION_SCHEDULE` | `0 2 * * *` | Ingestion cron schedule |
-| `TRANSFORM_SCHEDULE` | `0 4 * * *` | Transform cron schedule |
-| `DEPLOYMENT_SCHEDULE` | `0 6 * * *` | Deployment cron schedule |
 
 ### Airflow Connections
 
@@ -159,7 +152,7 @@ uv sync --all-groups
 uv run pytest tests/ -v
 
 # Run with coverage
-uv run pytest tests/ --cov=dags --cov=utils --cov=config
+uv run pytest tests/ --cov=dags --cov=config
 
 # Run specific test file
 uv run pytest tests/test_ingestion_dag.py -v
@@ -169,13 +162,13 @@ uv run pytest tests/test_ingestion_dag.py -v
 
 ```bash
 # Check code style
-uv run ruff check dags/ utils/ config/ tests/
+uv run ruff check dags/ config/ tests/
 
 # Auto-fix issues
-uv run ruff check --fix dags/ utils/ config/ tests/
+uv run ruff check --fix dags/ config/ tests/
 
 # Format code
-uv run ruff format dags/ utils/ config/ tests/
+uv run ruff format dags/ config/ tests/
 ```
 
 ### Docker Commands

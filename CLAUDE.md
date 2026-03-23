@@ -31,20 +31,20 @@ uv run pytest tests/ -v
 uv run pytest tests/test_ingestion_dag.py -v
 
 # Run with coverage
-uv run pytest tests/ --cov=dags --cov=utils --cov=config
+uv run pytest tests/ --cov=dags --cov=config
 ```
 
 ### Linting
 
 ```bash
 # Check code style
-uv run ruff check dags/ utils/ config/ tests/
+uv run ruff check dags/ config/ tests/
 
 # Auto-fix issues
-uv run ruff check --fix dags/ utils/ config/ tests/
+uv run ruff check --fix dags/ config/ tests/
 
 # Format code
-uv run ruff format dags/ utils/ config/ tests/
+uv run ruff format dags/ config/ tests/
 ```
 
 ### Local Development with Docker
@@ -100,8 +100,6 @@ igh-airflow/
 │   └── igh_deployment_dag.py # Production deployment
 ├── config/                  # Configuration modules
 │   └── settings.py          # PipelineConfig dataclass
-├── utils/                   # Utility functions
-├── plugins/                 # Airflow plugins (empty)
 ├── data/                    # Data directories (bronze/silver/production)
 ├── logs/                    # Airflow logs
 ├── tests/                   # Unit tests
@@ -109,7 +107,6 @@ igh-airflow/
 │   ├── Dockerfile           # Airflow 3.1.6 + igh-data-sync
 │   └── entrypoint.sh        # Custom entrypoint
 ├── docker-compose.yml       # Local development (CeleryExecutor)
-├── docker-compose.mimic-prod.yml # Production-like setup
 └── pyproject.toml           # Project configuration
 ```
 
