@@ -22,9 +22,7 @@ RUN pip install --upgrade -r requirements.txt && rm requirements.txt
 
 # Copy DAGs and project files
 COPY --chown=airflow:root dags/ /opt/airflow/dags/
-COPY --chown=airflow:root plugins/ /opt/airflow/plugins/
 COPY --chown=airflow:root config/ /opt/airflow/config/
-COPY --chown=airflow:root utils/ /opt/airflow/utils/
 
 # Copy entrypoint
 COPY --chown=airflow:root docker/entrypoint.sh /entrypoint-custom.sh
