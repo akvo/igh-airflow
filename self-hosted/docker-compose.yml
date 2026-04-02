@@ -37,18 +37,13 @@ x-airflow-common: &airflow-common
     # IGH Data Pipeline: data paths
     BRONZE_DB_PATH: ${BRONZE_DB_PATH:-/opt/airflow/data/bronze/dataverse.db}
     SILVER_DB_PATH: ${SILVER_DB_PATH:-/opt/airflow/data/silver/igh_silver.db}
+    GOLD_DB_PATH: ${GOLD_DB_PATH:-/opt/airflow/data/gold/star_schema.db}
     PRODUCTION_DB_PATH: ${PRODUCTION_DB_PATH:-/opt/airflow/data/production/igh.db}
-    # IGH Data Pipeline: DAG schedules
-    INGESTION_SCHEDULE: ${INGESTION_SCHEDULE:-0 2 * * *}
-    TRANSFORM_SCHEDULE: ${TRANSFORM_SCHEDULE:-0 4 * * *}
-    DEPLOYMENT_SCHEDULE: ${DEPLOYMENT_SCHEDULE:-0 6 * * *}
     # IGH Data Pipeline: Dataverse credentials
     DATAVERSE_API_URL: ${DATAVERSE_API_URL}
     DATAVERSE_CLIENT_ID: ${DATAVERSE_CLIENT_ID}
     DATAVERSE_CLIENT_SECRET: ${DATAVERSE_CLIENT_SECRET}
     DATAVERSE_SCOPE: ${DATAVERSE_SCOPE}
-    # IGH Data Pipeline: Slack alerts
-    SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
   volumes:
     # Production: only runtime data volumes (code is baked into image)
     - airflow-logs:/opt/airflow/logs
@@ -217,7 +212,7 @@ services:
       - |
         echo "Creating data directories..."
         mkdir -p /opt/airflow/{logs,data}
-        mkdir -p /opt/airflow/data/{bronze,silver,production}
+        mkdir -p /opt/airflow/data/{bronze,silver,gold,production}
         echo "Setting ownership..."
         chown -R "50000:0" /opt/airflow/logs /opt/airflow/data
         echo "Airflow version:"
