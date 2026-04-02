@@ -130,6 +130,7 @@ igh-airflow/
 | `AIRFLOW__API__SECRET_KEY` | API secret key for JWT | - |
 | `BRONZE_DB_PATH` | Bronze database location | `/opt/airflow/data/bronze/dataverse.db` |
 | `SILVER_DB_PATH` | Silver database location | `/opt/airflow/data/silver/igh_silver.db` |
+| `GOLD_DB_PATH` | Gold star-schema database location | `/opt/airflow/data/gold/star_schema.db` |
 | `PRODUCTION_DB_PATH` | Production database location | `/opt/airflow/data/production/igh.db` |
 | `DATAVERSE_API_URL` | Dataverse API endpoint URL | - |
 | `DATAVERSE_CLIENT_ID` | OAuth client ID | - |

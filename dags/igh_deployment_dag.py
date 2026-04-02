@@ -22,16 +22,19 @@ default_args = {
 
 
 def deploy_to_production(**context):
-    """Deploy Silver database to production with atomic swap."""
+    """Deploy Gold star-schema database to production with atomic swap."""
     import logging
 
     logger = logging.getLogger(__name__)
 
-    silver_path = Path(config.silver_db_path)
+    gold_path = Path(config.gold_db_path)
     production_path = Path(config.production_db_path)
     backup_path = production_path.with_suffix(".db.backup")
 
-    logger.info(f"Deploying {silver_path} to {production_path}")
+    if not gold_path.exists():
+        raise FileNotFoundError(f"Gold database not found: {gold_path}")
+
+    logger.info(f"Deploying {gold_path} to {production_path}")
 
     # Ensure production directory exists
     production_path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,7 +47,7 @@ def deploy_to_production(**context):
     try:
         # Atomic copy to production
         temp_path = production_path.with_suffix(".db.tmp")
-        shutil.copy2(silver_path, temp_path)
+        shutil.copy2(gold_path, temp_path)
         temp_path.rename(production_path)
         logger.info("Production deployment successful")
 
