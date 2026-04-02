@@ -1682,7 +1682,7 @@ requires-dist = [
     { name = "apache-airflow-providers-fab", specifier = ">=2.0.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "igh-data-sync", git = "https://github.com/akvo/igh-data-sync.git" },
-    { name = "igh-data-transform", git = "https://github.com/akvo/igh-data-transform.git?branch=silver-to-gold-transformation" },
+    { name = "igh-data-transform", git = "https://github.com/akvo/igh-data-transform.git" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
 ]
@@ -1708,7 +1708,7 @@ dependencies = [
 [[package]]
 name = "igh-data-transform"
 version = "0.1.0"
-source = { git = "https://github.com/akvo/igh-data-transform.git?branch=silver-to-gold-transformation#55d7918c6f9ed32e00e04f76bd06f8b0f43b697e" }
+source = { git = "https://github.com/akvo/igh-data-transform.git#f6c26cf034cbb7e37c66e4058d29157c820a6685" }
 dependencies = [
     { name = "pandas" },
     { name = "pycountry" },
