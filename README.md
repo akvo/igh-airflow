@@ -59,7 +59,7 @@ docker compose up -d
 └─────────────────┘    └─────────────────┘    └─────────────────┘
         │                      │                      │
         ▼                      ▼                      ▼
-   Dataverse            Bronze → Silver        Silver → Production
+   Dataverse            Bronze → Silver        Gold → Production
    → Bronze             Silver → Gold          (atomic swap)
 ```
 
@@ -110,6 +110,7 @@ igh-airflow/
 | `AIRFLOW_UID` | `50000` | User ID for Airflow processes |
 | `BRONZE_DB_PATH` | `/opt/airflow/data/bronze/dataverse.db` | Bronze database path |
 | `SILVER_DB_PATH` | `/opt/airflow/data/silver/igh_silver.db` | Silver database path |
+| `GOLD_DB_PATH` | `/opt/airflow/data/gold/star_schema.db` | Gold star-schema database path |
 | `PRODUCTION_DB_PATH` | `/opt/airflow/data/production/igh.db` | Production database path |
 
 ### Airflow Connections
@@ -128,6 +129,7 @@ Configure these in the Airflow UI (Admin → Variables):
 |----------|---------|-------------|
 | `bronze_db_path` | `/data/bronze/dataverse.db` | Bronze database path |
 | `silver_db_path` | `/data/silver/igh_silver.db` | Silver database path |
+| `gold_db_path` | `/data/gold/star_schema.db` | Gold star-schema database path |
 | `production_db_path` | `/data/production/igh.db` | Production database path |
 
 ## Development

@@ -29,6 +29,7 @@ class PipelineConfig:
     silver_db_path: str = field(
         default_factory=lambda: get_env("SILVER_DB_PATH", "/opt/airflow/data/silver/igh_silver.db")
     )
+    gold_db_path: str = field(default_factory=lambda: get_env("GOLD_DB_PATH", "/opt/airflow/data/gold/star_schema.db"))
     production_db_path: str = field(
         default_factory=lambda: get_env("PRODUCTION_DB_PATH", "/opt/airflow/data/production/igh.db")
     )

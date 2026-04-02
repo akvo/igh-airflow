@@ -45,4 +45,4 @@ python_functions = ["test_*"]
 
 [tool.uv.sources]
 igh-data-sync = { git = "https://github.com/akvo/igh-data-sync.git" }
-igh-data-transform = { git = "https://github.com/akvo/igh-data-transform.git" }
+igh-data-transform = { git = "https://github.com/akvo/igh-data-transform.git", branch = "silver-to-gold-transformation" }

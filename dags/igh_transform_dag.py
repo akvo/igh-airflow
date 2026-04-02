@@ -50,22 +50,29 @@ def run_bronze_to_silver(**context):
 
 
 def run_silver_to_gold(**context):
-    """Transform Silver layer to Gold layer using igh-data-transform."""
+    """Transform Silver layer to Gold layer (star schema) using igh-data-transform."""
     from igh_data_transform import silver_to_gold
 
     silver_path = Path(config.silver_db_path)
+    gold_path = Path(config.gold_db_path)
+
+    # Ensure output directory exists
+    gold_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info("Starting Silver to Gold transformation")
     logger.info("Source: %s", silver_path)
+    logger.info("Target: %s", gold_path)
 
-    # Note: silver_to_gold is currently a stub in igh-data-transform
-    success = silver_to_gold(silver_db_path=str(silver_path))
+    success = silver_to_gold(
+        silver_db_path=str(silver_path),
+        gold_db_path=str(gold_path),
+    )
 
     if not success:
         raise RuntimeError("Silver to Gold transformation failed")
 
     logger.info("Silver to Gold transformation completed successfully")
-    return {"status": "success", "source": str(silver_path)}
+    return {"status": "success", "source": str(silver_path), "target": str(gold_path)}
 
 
 with DAG(
