@@ -147,6 +147,43 @@ uv sync
 uv sync --all-groups
 ```
 
+### Updating Internal Packages
+
+This project depends on two internal Akvo packages installed directly from GitHub (not PyPI):
+
+| Package | Repository | Purpose |
+|---------|-----------|---------|
+| `igh-data-sync` | [akvo/igh-data-sync](https://github.com/akvo/igh-data-sync) | Dataverse ingestion |
+| `igh-data-transform` | [akvo/igh-data-transform](https://github.com/akvo/igh-data-transform) | Bronze→Silver→Gold transforms |
+
+Their source URLs and branches are configured in `pyproject.toml` under `[tool.uv.sources]`, and `uv.lock` pins each package to a specific commit hash. Running `uv sync` alone will **not** pull newer commits — you must explicitly upgrade the lock entry.
+
+```bash
+# Update a single package to the latest commit on its configured branch
+uv lock --upgrade-package igh-data-sync && uv sync
+uv lock --upgrade-package igh-data-transform && uv sync
+
+# Update both at once
+uv lock --upgrade-package igh-data-sync --upgrade-package igh-data-transform && uv sync
+```
+
+To switch a package to a different branch, edit `pyproject.toml`:
+
+```toml
+[tool.uv.sources]
+igh-data-transform = { git = "https://github.com/akvo/igh-data-transform.git", branch = "new-branch" }
+```
+
+Then run `uv lock --upgrade-package igh-data-transform && uv sync` to resolve
+the new branch. To point back to the default branch, remove the `branch` key.
+
+After updating packages, rebuild the Docker image so containers use the new
+code:
+
+```bash
+docker compose build --no-cache && docker compose up -d
+```
+
 ### Running Tests
 
 ```bash
