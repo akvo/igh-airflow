@@ -60,3 +60,6 @@ Thumbs.db
 
 # Data directories (mounted volumes)
 data/
+
+# Claude local configs
+.claude/*.local.*
