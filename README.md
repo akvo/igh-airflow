@@ -111,7 +111,10 @@ igh-airflow/
 | `BRONZE_DB_PATH` | `/opt/airflow/data/bronze/dataverse.db` | Bronze database path |
 | `SILVER_DB_PATH` | `/opt/airflow/data/silver/igh_silver.db` | Silver database path |
 | `GOLD_DB_PATH` | `/opt/airflow/data/gold/star_schema.db` | Gold star-schema database path |
-| `PRODUCTION_DB_PATH` | `/opt/airflow/data/production/igh.db` | Production database path |
+| `DEPLOY_TARGET_HOST` | `local` (dev compose) | Dashboard server host (`local` or empty to skip) |
+| `DEPLOY_TARGET_USER` | - | SSH user on dashboard server |
+| `DEPLOY_TARGET_PATH` | - | Remote path for `star_schema.db` |
+| `DEPLOY_SSH_KEY_PATH` | `/opt/airflow/ssh/id_rsa` | SSH private key path inside container |
 
 ### Airflow Connections
 

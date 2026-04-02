@@ -1,6 +1,6 @@
-"""IGH Deployment DAG - Deploys validated data to production."""
+"""IGH Deployment DAG - Deploys gold database to remote dashboard server."""
 
-import shutil
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -21,49 +21,92 @@ default_args = {
 }
 
 
-def deploy_to_production(**context):
-    """Deploy Gold star-schema database to production with atomic swap."""
+def _is_local_mode():
+    return config.deploy_target_host in ("local", "")
+
+
+def _validate_deploy_config():
+    """Raise if required deploy settings are missing."""
+    missing = []
+    if not config.deploy_target_user:
+        missing.append("DEPLOY_TARGET_USER")
+    if not config.deploy_target_path:
+        missing.append("DEPLOY_TARGET_PATH")
+    if missing:
+        raise ValueError(f"Missing required deploy config: {', '.join(missing)}")
+
+
+def scp_gold_db(**context):
+    """SCP the gold star-schema database to the remote server."""
     import logging
 
     logger = logging.getLogger(__name__)
 
-    gold_path = Path(config.gold_db_path)
-    production_path = Path(config.production_db_path)
-    backup_path = production_path.with_suffix(".db.backup")
+    if _is_local_mode():
+        logger.warning("Skipping SCP — DEPLOY_TARGET_HOST is 'local' (dev mode)")
+        return {"status": "skipped", "reason": "local mode"}
 
+    _validate_deploy_config()
+
+    gold_path = Path(config.gold_db_path)
     if not gold_path.exists():
         raise FileNotFoundError(f"Gold database not found: {gold_path}")
 
-    logger.info(f"Deploying {gold_path} to {production_path}")
+    target = (
+        f"{config.deploy_target_user}@{config.deploy_target_host}"
+        f":{config.deploy_target_path}/star_schema.db.new"
+    )
+    cmd = [
+        "scp",
+        "-i", config.deploy_ssh_key_path,
+        "-o", "StrictHostKeyChecking=accept-new",
+        str(gold_path),
+        target,
+    ]
 
-    # Ensure production directory exists
-    production_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"SCP gold DB to {target}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        raise RuntimeError(f"SCP failed (rc={result.returncode}): {result.stderr}")
 
-    # Backup existing production database
-    if production_path.exists():
-        logger.info(f"Backing up existing production database to {backup_path}")
-        shutil.copy2(production_path, backup_path)
+    logger.info("SCP completed successfully")
+    return {"status": "uploaded", "target": target}
 
-    try:
-        # Atomic copy to production
-        temp_path = production_path.with_suffix(".db.tmp")
-        shutil.copy2(gold_path, temp_path)
-        temp_path.rename(production_path)
-        logger.info("Production deployment successful")
 
-        # Remove backup on success
-        if backup_path.exists():
-            backup_path.unlink()
+def swap_remote_db(**context):
+    """Atomically swap star_schema.db.new to star_schema.db on the remote server."""
+    import logging
 
-    except Exception as e:
-        # Rollback on failure
-        logger.error(f"Deployment failed: {e}")
-        if backup_path.exists():
-            logger.info("Rolling back to backup")
-            shutil.copy2(backup_path, production_path)
-        raise
+    logger = logging.getLogger(__name__)
 
-    return {"status": "deployed", "path": str(production_path)}
+    if _is_local_mode():
+        logger.warning("Skipping swap — DEPLOY_TARGET_HOST is 'local' (dev mode)")
+        return {"status": "skipped", "reason": "local mode"}
+
+    _validate_deploy_config()
+
+    # mv on the same filesystem is atomic and changes the inode, which
+    # triggers the dashboard backend's hot-reload (DatabaseManager detects
+    # inode changes and reconnects automatically).
+    swap_cmd = (
+        f"mv {config.deploy_target_path}/star_schema.db.new"
+        f" {config.deploy_target_path}/star_schema.db"
+    )
+    cmd = [
+        "ssh",
+        "-i", config.deploy_ssh_key_path,
+        "-o", "StrictHostKeyChecking=accept-new",
+        f"{config.deploy_target_user}@{config.deploy_target_host}",
+        swap_cmd,
+    ]
+
+    logger.info(f"Swapping DB on {config.deploy_target_host}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        raise RuntimeError(f"SSH swap failed (rc={result.returncode}): {result.stderr}")
+
+    logger.info("Remote DB swap completed successfully")
+    return {"status": "deployed", "host": config.deploy_target_host}
 
 
 with DAG(
@@ -76,7 +119,14 @@ with DAG(
     catchup=False,
     tags=["igh", "deployment", "production"],
 ) as dag:
-    deploy = PythonOperator(
-        task_id="deploy_to_production",
-        python_callable=deploy_to_production,
+    scp_task = PythonOperator(
+        task_id="scp_gold_db",
+        python_callable=scp_gold_db,
     )
+
+    swap_task = PythonOperator(
+        task_id="swap_remote_db",
+        python_callable=swap_remote_db,
+    )
+
+    scp_task >> swap_task

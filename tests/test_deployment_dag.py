@@ -29,11 +29,21 @@ def test_dag_has_tasks():
     from dags.igh_deployment_dag import dag
 
     task_ids = [task.task_id for task in dag.tasks]
-    assert "deploy_to_production" in task_ids
+    assert "scp_gold_db" in task_ids
+    assert "swap_remote_db" in task_ids
 
 
 def test_dag_task_count():
     """Test that the DAG has the expected number of tasks."""
     from dags.igh_deployment_dag import dag
 
-    assert len(dag.tasks) == 1
+    assert len(dag.tasks) == 2
+
+
+def test_task_ordering():
+    """Test that scp_gold_db runs before swap_remote_db."""
+    from dags.igh_deployment_dag import dag
+
+    scp_task = dag.get_task("scp_gold_db")
+    downstream_ids = [t.task_id for t in scp_task.downstream_list]
+    assert "swap_remote_db" in downstream_ids

@@ -152,7 +152,10 @@ docker compose --profile debug run --rm airflow-cli bash
 | `SLACK_WEBHOOK_URL` | Slack webhook URL for alerts (optional) |
 | `BRONZE_DB_PATH` | Path to Bronze SQLite database |
 | `SILVER_DB_PATH` | Path to Silver SQLite database |
-| `PRODUCTION_DB_PATH` | Path to Production SQLite database |
+| `DEPLOY_SSH_KEY_PATH_HOST` | Host path to SSH key for Docker mount |
+| `DEPLOY_TARGET_HOST` | Dashboard server host |
+| `DEPLOY_TARGET_USER` | SSH user on dashboard server |
+| `DEPLOY_TARGET_PATH` | Remote path for `star_schema.db` |
 | `INGESTION_SCHEDULE` | Cron schedule for ingestion DAG (default: `0 2 * * *`) |
 | `TRANSFORM_SCHEDULE` | Cron schedule for transform DAG (default: `0 4 * * *`) |
 | `DEPLOYMENT_SCHEDULE` | Cron schedule for deployment DAG (default: `0 6 * * *`) |
