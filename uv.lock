@@ -1698,7 +1698,7 @@ dev = [
 [[package]]
 name = "igh-data-sync"
 version = "0.1.0"
-source = { git = "https://github.com/akvo/igh-data-sync.git#07580bab6f1c64ff93eeb8ffd3899435f19b46f7" }
+source = { git = "https://github.com/akvo/igh-data-sync.git#5fd9b76a8d6ae79c69398e533416a545758bac23" }
 dependencies = [
     { name = "aiohttp" },
     { name = "python-dotenv" },
