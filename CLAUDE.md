@@ -87,7 +87,8 @@ igh_transform (manual only)
     └── silver_to_gold
 
 igh_deployment (manual only)
-    └── deploy_to_production
+    ├── scp_gold_db
+    └── swap_remote_db
 ```
 
 ### Project Structure
@@ -131,7 +132,11 @@ igh-airflow/
 | `BRONZE_DB_PATH` | Bronze database location | `/opt/airflow/data/bronze/dataverse.db` |
 | `SILVER_DB_PATH` | Silver database location | `/opt/airflow/data/silver/igh_silver.db` |
 | `GOLD_DB_PATH` | Gold star-schema database location | `/opt/airflow/data/gold/star_schema.db` |
-| `PRODUCTION_DB_PATH` | Production database location | `/opt/airflow/data/production/igh.db` |
+| `DEPLOY_SSH_KEY_PATH` | SSH private key path inside container | `/opt/airflow/ssh/id_rsa` |
+| `DEPLOY_TARGET_HOST` | Dashboard server host (`local` or empty to skip) | `local` (dev compose) |
+| `DEPLOY_TARGET_USER` | SSH user on dashboard server | - |
+| `DEPLOY_TARGET_PATH` | Remote path for `star_schema.db` | - |
+| `DEPLOY_SSH_KEY_PATH_HOST` | Host path to SSH key (Docker mount, self-hosted only) | `./ssh/id_rsa` |
 | `DATAVERSE_API_URL` | Dataverse API endpoint URL | - |
 | `DATAVERSE_CLIENT_ID` | OAuth client ID | - |
 | `DATAVERSE_CLIENT_SECRET` | OAuth client secret | - |

@@ -38,7 +38,11 @@ x-airflow-common: &airflow-common
     BRONZE_DB_PATH: ${BRONZE_DB_PATH:-/opt/airflow/data/bronze/dataverse.db}
     SILVER_DB_PATH: ${SILVER_DB_PATH:-/opt/airflow/data/silver/igh_silver.db}
     GOLD_DB_PATH: ${GOLD_DB_PATH:-/opt/airflow/data/gold/star_schema.db}
-    PRODUCTION_DB_PATH: ${PRODUCTION_DB_PATH:-/opt/airflow/data/production/igh.db}
+    # Deployment target (remote dashboard server)
+    DEPLOY_SSH_KEY_PATH: ${DEPLOY_SSH_KEY_PATH:-/opt/airflow/ssh/id_rsa}
+    DEPLOY_TARGET_HOST: ${DEPLOY_TARGET_HOST}
+    DEPLOY_TARGET_USER: ${DEPLOY_TARGET_USER}
+    DEPLOY_TARGET_PATH: ${DEPLOY_TARGET_PATH}
     # IGH Data Pipeline: Dataverse credentials
     DATAVERSE_API_URL: ${DATAVERSE_API_URL}
     DATAVERSE_CLIENT_ID: ${DATAVERSE_CLIENT_ID}
@@ -48,6 +52,8 @@ x-airflow-common: &airflow-common
     # Production: only runtime data volumes (code is baked into image)
     - airflow-logs:/opt/airflow/logs
     - airflow-data:/opt/airflow/data
+    - airflow-ssh:/opt/airflow/ssh
+    - ${DEPLOY_SSH_KEY_PATH_HOST:-./ssh/id_rsa}:/opt/airflow/ssh-host/id_rsa:ro
   user: "50000:0"
   security_opt:
     - no-new-privileges:true
@@ -211,10 +217,16 @@ services:
       - -c
       - |
         echo "Creating data directories..."
-        mkdir -p /opt/airflow/{logs,data}
-        mkdir -p /opt/airflow/data/{bronze,silver,gold,production}
+        mkdir -p /opt/airflow/{logs,data,ssh}
+        mkdir -p /opt/airflow/data/{bronze,silver,gold}
+        # Copy SSH deploy key with correct permissions (host bind mount
+        # preserves host ownership, which may not match UID 50000)
+        if [ -f /opt/airflow/ssh-host/id_rsa ]; then
+          cp /opt/airflow/ssh-host/id_rsa /opt/airflow/ssh/id_rsa
+          chmod 600 /opt/airflow/ssh/id_rsa
+        fi
         echo "Setting ownership..."
-        chown -R "50000:0" /opt/airflow/logs /opt/airflow/data
+        chown -R "50000:0" /opt/airflow/logs /opt/airflow/data /opt/airflow/ssh
         echo "Airflow version:"
         /entrypoint airflow version
         echo "Done!"
@@ -265,5 +277,7 @@ volumes:
     name: igh-airflow-logs
   airflow-data:
     name: igh-airflow-data
+  airflow-ssh:
+    name: igh-airflow-ssh
   letsencrypt:
     name: igh-airflow-letsencrypt
