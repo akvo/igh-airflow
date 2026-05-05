@@ -37,3 +37,15 @@ def test_dag_task_count():
     from dags.igh_ingestion_dag import dag
 
     assert len(dag.tasks) == 1
+
+
+def test_dag_has_update_mode_param():
+    """Test that the DAG declares an `update_mode` boolean param defaulting to False."""
+    from dags.igh_ingestion_dag import dag
+
+    assert "update_mode" in dag.params
+    param = dag.params.get_param("update_mode")
+    # Param.value returns the resolved/default value.
+    assert param.value is False
+    # Schema check: ensure it's declared as boolean so the UI renders a checkbox.
+    assert param.schema.get("type") == "boolean"
