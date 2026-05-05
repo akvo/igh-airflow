@@ -52,14 +52,13 @@ def scp_gold_db(**context):
     if not gold_path.exists():
         raise FileNotFoundError(f"Gold database not found: {gold_path}")
 
-    target = (
-        f"{config.deploy_target_user}@{config.deploy_target_host}"
-        f":{config.deploy_target_path}/star_schema.db.new"
-    )
+    target = f"{config.deploy_target_user}@{config.deploy_target_host}:{config.deploy_target_path}/star_schema.db.new"
     cmd = [
         "scp",
-        "-i", config.deploy_ssh_key_path,
-        "-o", "StrictHostKeyChecking=accept-new",
+        "-i",
+        config.deploy_ssh_key_path,
+        "-o",
+        "StrictHostKeyChecking=accept-new",
         str(gold_path),
         target,
     ]
@@ -88,14 +87,13 @@ def swap_remote_db(**context):
     # mv on the same filesystem is atomic and changes the inode, which
     # triggers the dashboard backend's hot-reload (DatabaseManager detects
     # inode changes and reconnects automatically).
-    swap_cmd = (
-        f"mv {config.deploy_target_path}/star_schema.db.new"
-        f" {config.deploy_target_path}/star_schema.db"
-    )
+    swap_cmd = f"mv {config.deploy_target_path}/star_schema.db.new {config.deploy_target_path}/star_schema.db"
     cmd = [
         "ssh",
-        "-i", config.deploy_ssh_key_path,
-        "-o", "StrictHostKeyChecking=accept-new",
+        "-i",
+        config.deploy_ssh_key_path,
+        "-o",
+        "StrictHostKeyChecking=accept-new",
         f"{config.deploy_target_user}@{config.deploy_target_host}",
         swap_cmd,
     ]
