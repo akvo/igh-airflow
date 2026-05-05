@@ -31,18 +31,10 @@ class PipelineConfig:
     )
     gold_db_path: str = field(default_factory=lambda: get_env("GOLD_DB_PATH", "/opt/airflow/data/gold/star_schema.db"))
     # Deployment target (remote dashboard server)
-    deploy_ssh_key_path: str = field(
-        default_factory=lambda: get_env("DEPLOY_SSH_KEY_PATH", "/opt/airflow/ssh/id_rsa")
-    )
-    deploy_target_host: str = field(
-        default_factory=lambda: get_env("DEPLOY_TARGET_HOST", "")
-    )
-    deploy_target_user: str = field(
-        default_factory=lambda: get_env("DEPLOY_TARGET_USER", "")
-    )
-    deploy_target_path: str = field(
-        default_factory=lambda: get_env("DEPLOY_TARGET_PATH", "")
-    )
+    deploy_ssh_key_path: str = field(default_factory=lambda: get_env("DEPLOY_SSH_KEY_PATH", "/opt/airflow/ssh/id_rsa"))
+    deploy_target_host: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_HOST", ""))
+    deploy_target_user: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_USER", ""))
+    deploy_target_path: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_PATH", ""))
 
 
 # Singleton instance for easy import
