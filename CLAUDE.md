@@ -114,7 +114,7 @@ igh-airflow/
 ### Key Modules
 
 - **config/settings.py**: Centralized configuration with `PipelineConfig` dataclass. Uses `get_env()` to read from environment variables with fallback to Airflow Variables.
-- **dags/igh_ingestion_dag.py**: Uses `igh-data-sync` library to sync from Dataverse.
+- **dags/igh_ingestion_dag.py**: Uses `igh-data-sync` library to sync from Dataverse. Exposes a boolean DAG param `update_mode` (default `False`). When `False` the task deletes the existing bronze DB before syncing (fresh build, matching `sync-and-run-etl.sh`); when `True` it keeps the bronze DB and syncs incrementally.
 
 ## Configuration
 
