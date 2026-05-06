@@ -59,6 +59,13 @@ Pulls the latest data from Dataverse.
 Typical run time: a few minutes, but can be longer on the first run
 of the day. Wait until the single step is dark green.
 
+> **Note:** when you click Trigger for this job, Airflow shows a
+> small form with a single checkbox labeled **Update mode
+> (incremental sync)**. **Leave it unchecked** and click the
+> submit/trigger button — this gives you a fresh data refresh,
+> which is what you want. Only tick it if the engineering team
+> specifically asks you to.
+
 ### Job 2 of 3 — **2. IGH Transform**
 
 Cleans and prepares the data for the dashboard. This job has **two
