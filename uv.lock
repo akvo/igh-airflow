@@ -1708,7 +1708,7 @@ dependencies = [
 [[package]]
 name = "igh-data-transform"
 version = "0.1.0"
-source = { git = "https://github.com/akvo/igh-data-transform.git#f6c26cf034cbb7e37c66e4058d29157c820a6685" }
+source = { git = "https://github.com/akvo/igh-data-transform.git#5982a05f9590934e77a545cdff4562fd03dfaeeb" }
 dependencies = [
     { name = "pandas" },
     { name = "pycountry" },
