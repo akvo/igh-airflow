@@ -43,6 +43,8 @@ x-airflow-common: &airflow-common
     DEPLOY_TARGET_HOST: ${DEPLOY_TARGET_HOST}
     DEPLOY_TARGET_USER: ${DEPLOY_TARGET_USER}
     DEPLOY_TARGET_PATH: ${DEPLOY_TARGET_PATH}
+    # IGH Data Pipeline: deployment trigger mode
+    DEPLOY_AUTO_TRIGGER: ${DEPLOY_AUTO_TRIGGER:-false}
     # IGH Data Pipeline: Dataverse credentials
     DATAVERSE_API_URL: ${DATAVERSE_API_URL}
     DATAVERSE_CLIENT_ID: ${DATAVERSE_CLIENT_ID}

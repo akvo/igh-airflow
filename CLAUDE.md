@@ -76,19 +76,16 @@ docker compose --profile flower up -d
 
 ### DAG Pipeline
 
-All DAGs are manual-trigger only — no schedules, no cross-DAG triggers.
+The pipeline auto-chains via Airflow Assets. Ingestion is manual; transform
+runs on the bronze Asset; deployment is manual by default or auto-runs on
+the gold Asset when DEPLOY_AUTO_TRIGGER=true. Asset triggering requires the
+consuming DAG to be unpaused.
 
 ```
-igh_ingestion (manual only)
-    └── sync_dataverse
-
-igh_transform (manual only)
-    ├── bronze_to_silver
-    └── silver_to_gold
-
-igh_deployment (manual only)
-    ├── scp_gold_db
-    └── swap_remote_db
+igh_ingestion (manual)          sync_dataverse        -> Asset: igh_bronze_db
+igh_transform (on igh_bronze_db) bronze_to_silver     -> Asset: igh_silver_db
+                                 silver_to_gold        -> Asset: igh_gold_db
+igh_deployment (manual or on igh_gold_db) scp_gold_db >> swap_remote_db
 ```
 
 ### Project Structure
@@ -98,7 +95,10 @@ igh-airflow/
 ├── dags/                    # Airflow DAG definitions
 │   ├── igh_ingestion_dag.py # Dataverse sync using igh-data-sync
 │   ├── igh_transform_dag.py # Bronze→Silver→Gold
-│   └── igh_deployment_dag.py # Production deployment
+│   ├── igh_deployment_dag.py # Production deployment
+│   └── igh_assets.py        # Shared Asset definitions (trigger baton)
+├── plugins/                 # Airflow plugins
+│   └── igh_download_plugin.py # Authenticated layer-DB download endpoint
 ├── config/                  # Configuration modules
 │   └── settings.py          # PipelineConfig dataclass
 ├── data/                    # Data directories (bronze/silver/production)
@@ -115,6 +115,14 @@ igh-airflow/
 
 - **config/settings.py**: Centralized configuration with `PipelineConfig` dataclass. Uses `get_env()` to read from environment variables with fallback to Airflow Variables.
 - **dags/igh_ingestion_dag.py**: Uses `igh-data-sync` library to sync from Dataverse. Exposes a boolean DAG param `update_mode` (default `False`). When `False` the task deletes the existing bronze DB before syncing (fresh build, matching `sync-and-run-etl.sh`); when `True` it keeps the bronze DB and syncs incrementally.
+
+### Layer Downloads
+
+`plugins/igh_download_plugin.py` registers a FastAPI sub-app on the API
+server at `GET /igh/download/{layer}` (`layer` ∈ bronze/silver/gold). It
+streams a consistent SQLite snapshot (online-backup API) as an attachment,
+authenticated via the same login as the Airflow UI (the `_token` JWT
+cookie). Returns 404 if that layer hasn't been produced yet.
 
 ## Configuration
 
@@ -137,6 +145,7 @@ igh-airflow/
 | `DEPLOY_TARGET_USER` | SSH user on dashboard server | - |
 | `DEPLOY_TARGET_PATH` | Remote path for `star_schema.db` | - |
 | `DEPLOY_SSH_KEY_PATH_HOST` | Host path to SSH key (Docker mount, self-hosted only) | `./ssh/id_rsa` |
+| `DEPLOY_AUTO_TRIGGER` | Auto-run deployment on the gold Asset (`true`) vs. manual (`false`) | `false` |
 | `DATAVERSE_API_URL` | Dataverse API endpoint URL | - |
 | `DATAVERSE_CLIENT_ID` | OAuth client ID | - |
 | `DATAVERSE_CLIENT_SECRET` | OAuth client secret | - |
