@@ -124,6 +124,15 @@ streams a consistent SQLite snapshot (online-backup API) as an attachment,
 authenticated via the same login as the Airflow UI (the `_token` JWT
 cookie). Returns 404 if that layer hasn't been produced yet.
 
+The plugin also adds **Downloads → Bronze/Silver/Gold DB** entries to the
+Airflow UI navigation (`appbuilder_menu_items`), each a link straight to
+`/igh/download/{layer}` that opens in a new tab and downloads. Two Airflow
+UI constraints shaped this: `external_views` are rendered in a sandboxed
+iframe (no `allow-downloads`) that blocks the download, so plain menu links
+are used instead; and Airflow renders plugin menu items as real links only
+when there are at least two, so all three layers are listed (a single item
+collapses into a non-navigating button).
+
 ## Configuration
 
 ### Environment Variables (`.env`)

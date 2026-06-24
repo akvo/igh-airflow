@@ -92,3 +92,18 @@ def test_authenticated_download_streams_db(monkeypatch, tmp_path):
         assert resp.content[:16] == b"SQLite format 3\x00"
     finally:
         dl.app.dependency_overrides.clear()
+
+
+def test_plugin_exposes_download_nav_links():
+    import igh_download_plugin as dl
+
+    items = {m["name"]: m for m in dl.IGHDownloadPlugin.appbuilder_menu_items}
+    assert set(items) == {"Bronze DB", "Silver DB", "Gold DB"}
+    # >= 2 items so Airflow renders them as real <a> anchors rather than a
+    # single non-navigating button.
+    assert len(dl.IGHDownloadPlugin.appbuilder_menu_items) >= 2
+    for layer in ("bronze", "silver", "gold"):
+        item = items[f"{layer.capitalize()} DB"]
+        assert item["href"] == f"/igh/download/{layer}"
+        assert item["category"] == "Downloads"
+        assert "url_route" not in item

@@ -1,9 +1,8 @@
 """IGH layer-database download plugin.
 
 Serves the bronze/silver/gold SQLite databases to authenticated users so
-data analysts can inspect each ETL layer. The FastAPI endpoint is added in
-the next task; this module first defines the layer->path map and the
-snapshot helper.
+data analysts can inspect each ETL layer, and adds a Downloads menu to the
+Airflow UI linking to each layer's download.
 """
 
 import os
@@ -93,4 +92,22 @@ class IGHDownloadPlugin(AirflowPlugin):
             "url_prefix": "/igh",
             "name": "IGH Downloads",
         }
+    ]
+    # Nav links — one per layer — so analysts can download from the menu.
+    # Two Airflow UI constraints shape this:
+    #  - external_views require a url_route and are rendered inside a sandboxed
+    #    iframe (sandbox="allow-scripts allow-same-origin allow-forms", no
+    #    allow-downloads), which blocks the download on click. So we use
+    #    appbuilder_menu_items (plain links) instead.
+    #  - Airflow renders plugin menu items as real <a> anchors only when there
+    #    are >= 2 of them; a single item collapses into a non-navigating
+    #    button. Listing all three layers keeps them as working links that
+    #    open in a new top-level tab (outside the iframe) and download.
+    appbuilder_menu_items = [
+        {
+            "name": f"{layer.capitalize()} DB",
+            "href": f"/igh/download/{layer}",
+            "category": "Downloads",
+        }
+        for layer in LAYER_PATHS
     ]
