@@ -49,3 +49,10 @@ def test_dag_has_update_mode_param():
     assert param.value is False
     # Schema check: ensure it's declared as boolean so the UI renders a checkbox.
     assert param.schema.get("type") == "boolean"
+
+
+def test_sync_task_emits_bronze_asset():
+    from dags.igh_ingestion_dag import dag
+
+    outlets = dag.get_task("sync_dataverse").outlets
+    assert [a.name for a in outlets] == ["igh_bronze_db"]

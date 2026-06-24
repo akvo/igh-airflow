@@ -14,6 +14,7 @@ from airflow.sdk import Param
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import config, get_env
+from igh_assets import bronze_asset
 
 default_args = {
     "owner": "igh",
@@ -120,4 +121,5 @@ with DAG(
         task_id="sync_dataverse",
         python_callable=sync_dataverse,
         execution_timeout=timedelta(hours=2),
+        outlets=[bronze_asset],
     )
