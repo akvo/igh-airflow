@@ -19,11 +19,19 @@ def test_dag_has_correct_tags():
     assert "transform" in dag.tags
 
 
-def test_dag_is_manual_only():
-    """Test that the DAG has no schedule (manual trigger only)."""
+def test_dag_is_scheduled_on_bronze_asset():
+    """Transform auto-runs when the bronze Asset is produced."""
     from dags.igh_transform_dag import dag
 
-    assert dag.schedule is None
+    assert [a.name for a in dag.schedule] == ["igh_bronze_db"]
+
+
+def test_tasks_emit_layer_assets():
+    """Each transform step publishes its output layer as an Asset."""
+    from dags.igh_transform_dag import dag
+
+    assert [a.name for a in dag.get_task("bronze_to_silver").outlets] == ["igh_silver_db"]
+    assert [a.name for a in dag.get_task("silver_to_gold").outlets] == ["igh_gold_db"]
 
 
 def test_dag_has_tasks():

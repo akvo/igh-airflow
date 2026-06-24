@@ -12,6 +12,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import config
+from igh_assets import bronze_asset, gold_asset, silver_asset
 
 default_args = {
     "owner": "igh",
@@ -81,7 +82,7 @@ with DAG(
     description="Transform data from Bronze to Silver and Gold layers",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=None,
+    schedule=[bronze_asset],
     catchup=False,
     tags=["igh", "transform", "silver", "gold"],
 ) as dag:
@@ -89,12 +90,14 @@ with DAG(
         task_id="bronze_to_silver",
         python_callable=run_bronze_to_silver,
         execution_timeout=timedelta(hours=1),
+        outlets=[silver_asset],
     )
 
     silver_to_gold_task = PythonOperator(
         task_id="silver_to_gold",
         python_callable=run_silver_to_gold,
         execution_timeout=timedelta(hours=1),
+        outlets=[gold_asset],
     )
 
     bronze_to_silver_task >> silver_to_gold_task
