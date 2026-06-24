@@ -21,6 +21,8 @@ def test_deploy_auto_trigger_defaults_false(monkeypatch):
 def test_deploy_auto_trigger_parses_truthy(monkeypatch):
     assert _fresh_config(monkeypatch, "true").deploy_auto_trigger is True
     assert _fresh_config(monkeypatch, "1").deploy_auto_trigger is True
+    assert _fresh_config(monkeypatch, "yes").deploy_auto_trigger is True
+    assert _fresh_config(monkeypatch, "on").deploy_auto_trigger is True
 
 
 def test_deploy_auto_trigger_parses_falsy(monkeypatch):

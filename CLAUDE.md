@@ -38,13 +38,13 @@ uv run pytest tests/ --cov=dags --cov=config
 
 ```bash
 # Check code style
-uv run ruff check dags/ config/ tests/
+uv run ruff check dags/ config/ plugins/ tests/
 
 # Auto-fix issues
-uv run ruff check --fix dags/ config/ tests/
+uv run ruff check --fix dags/ config/ plugins/ tests/
 
 # Format code
-uv run ruff format dags/ config/ tests/
+uv run ruff format dags/ config/ plugins/ tests/
 ```
 
 ### Local Development with Docker
