@@ -11,8 +11,9 @@ from airflow.providers.standard.operators.python import PythonOperator
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import config
 from igh_assets import bronze_asset, gold_asset, silver_asset
+
+from config.settings import config
 
 default_args = {
     "owner": "igh",

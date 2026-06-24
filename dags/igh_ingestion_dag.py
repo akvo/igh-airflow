@@ -13,8 +13,9 @@ from airflow.sdk import Param
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import config, get_env
 from igh_assets import bronze_asset
+
+from config.settings import config, get_env
 
 default_args = {
     "owner": "igh",
