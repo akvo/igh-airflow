@@ -1,5 +1,29 @@
 """Tests for IGH Deployment DAG."""
 
+import importlib
+import os
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_deployment_dag_module():
+    """Reload config and DAG modules after each test.
+
+    Tests that monkeypatch DEPLOY_AUTO_TRIGGER reload both modules to pick up
+    the env change; monkeypatch restores the env var on teardown but does NOT
+    re-reload, so sys.modules is left with the patched DAG. This fixture
+    ensures the module is always reset to the default (no-flag) state,
+    preventing schedule state from leaking into later tests.
+    """
+    yield
+    import config.settings
+    import dags.igh_deployment_dag
+
+    os.environ.pop("DEPLOY_AUTO_TRIGGER", None)
+    importlib.reload(config.settings)
+    importlib.reload(dags.igh_deployment_dag)
+
 
 def test_dag_loads():
     """Test that the deployment DAG loads without errors."""
