@@ -13,6 +13,8 @@ from airflow.sdk import Param
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from igh_assets import bronze_asset
+
 from config.settings import config, get_env
 
 default_args = {
@@ -120,4 +122,5 @@ with DAG(
         task_id="sync_dataverse",
         python_callable=sync_dataverse,
         execution_timeout=timedelta(hours=2),
+        outlets=[bronze_asset],
     )

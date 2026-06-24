@@ -35,6 +35,11 @@ class PipelineConfig:
     deploy_target_host: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_HOST", ""))
     deploy_target_user: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_USER", ""))
     deploy_target_path: str = field(default_factory=lambda: get_env("DEPLOY_TARGET_PATH", ""))
+    # When true, igh_deployment is scheduled on the gold Asset (auto-deploy);
+    # otherwise it is manual-trigger only. Read at DAG-parse time.
+    deploy_auto_trigger: bool = field(
+        default_factory=lambda: get_env("DEPLOY_AUTO_TRIGGER", "false").strip().lower() in ("1", "true", "yes", "on")
+    )
 
 
 # Singleton instance for easy import
