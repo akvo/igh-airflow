@@ -7,11 +7,14 @@ wait for each job to finish before starting the next.
 
 ## What this does
 
-You will log into the **Airflow** website and start three jobs, one
-after another. Together, the jobs pull the latest data from
-Dataverse, prepare it, and deliver it to the dashboard. When the
-third job finishes, the dashboard will show the new data
-automatically — no restart needed.
+You will log into the **Airflow** website and start the refresh. You
+start the **first** job by hand; the **second** job then runs on its
+own as soon as the first finishes. The **third** job delivers the
+result to the dashboard; depending on how your system is set up, it
+either runs on its own or you start it. Together, the jobs
+pull the latest data from Dataverse, prepare it, and deliver it to the
+dashboard. When the third job finishes, the dashboard will show the new
+data automatically — no restart needed.
 
 ## Before you start
 
@@ -32,28 +35,39 @@ If you don't have either, ask the engineering team.
    - **2. IGH Transform**
    - **3. IGH Deployment**
 
-## Step 2 — Run the three jobs in order
+## Step 2 — Run the jobs in order
 
-> ⚠️ **Important:** run them **one at a time**, in the numbered order
-> shown. Do not start the next job until the previous one has
-> finished successfully. If you start them out of order, the
-> dashboard will not update correctly.
+You always start the **first** job yourself. The **second** job
+(**2. IGH Transform**) then runs **automatically** when the first
+finishes. The **third** job (**3. IGH Deployment**) may run
+automatically too — that depends on how engineering set up your system.
+If it doesn't start on its own, you start it. Either way, watch each job
+and wait for it to finish before the next begins.
 
-For each job, follow the same pattern:
+> ⚠️ **Important:** always work in the numbered order, and wait for each
+> job to turn fully **dark green** before starting (or moving on to)
+> the next. Don't trigger **2. IGH Transform** by hand — it runs on its
+> own.
+
+To **start** a job (Ingestion and Deployment):
 
 1. Click the job name to open it.
 2. Click the **▶ play / Trigger** button (top-right of the page) and
    confirm.
-3. Watch the job run. Each step (shown as a coloured box) will be:
-   - **light grey** — waiting to start
-   - **lime / running** — in progress
-   - **dark green** — finished successfully ✅
-   - **red** — failed ❌ (see "If something goes wrong" below)
-4. Wait until **every** step is dark green before moving on.
 
-Run them in this order:
+To **watch** any job (including the one that starts on its own), open it
+and check each step (shown as a coloured box):
 
-### Job 1 of 3 — **1. IGH Ingestion**
+- **light grey** — waiting to start
+- **lime / running** — in progress
+- **dark green** — finished successfully ✅
+- **red** — failed ❌ (see "If something goes wrong" below)
+
+Wait until **every** step is dark green before moving on.
+
+Work through them in this order:
+
+### Job 1 of 3 — **1. IGH Ingestion**  (you start this)
 
 Pulls the latest data from Dataverse.
 Typical run time: a few minutes, but can be longer on the first run
@@ -66,16 +80,27 @@ of the day. Wait until the single step is dark green.
 > which is what you want. Only tick it if the engineering team
 > specifically asks you to.
 
-### Job 2 of 3 — **2. IGH Transform**
+When this job finishes, **2. IGH Transform starts on its own within a
+minute** — you don't need to do anything. (If it hasn't started after a
+couple of minutes, contact engineering — the job may be paused.)
 
-Cleans and prepares the data for the dashboard. This job has **two
-steps** that run one after the other. Wait until **both** are dark
-green.
+### Job 2 of 3 — **2. IGH Transform**  (starts automatically)
 
-### Job 3 of 3 — **3. IGH Deployment**
+Cleans and prepares the data for the dashboard. You don't trigger this
+one — open it and watch. It has **two steps** that run one after the
+other. Wait until **both** are dark green before starting Job 3.
 
-Delivers the finished data to the dashboard server. This job also
-has two steps. Wait until both are dark green.
+### Job 3 of 3 — **3. IGH Deployment**  (you may need to start this)
+
+Delivers the finished data to the dashboard server. Depending on your
+setup, it either starts on its own once Transform finishes, or you start
+it the same way you started Ingestion. It has two steps; wait until both
+are dark green.
+
+> **Note:** if **3. IGH Deployment** has already started or finished on
+> its own by the time you reach it, that's expected — your system is set
+> up to deploy automatically, so just watch it to the end instead of
+> starting it.
 
 ## Step 3 — Check the dashboard
 
@@ -101,6 +126,23 @@ restart the failed step for you or tell you it's safe to re-run.
 ## Contact
 
 - **Engineering team:** `TODO — add Slack channel / email here`
+
+## Downloading the database files (optional)
+
+If you need to inspect the data yourself, Airflow can hand you a copy of
+each stage's database as a file:
+
+1. Log into Airflow (Step 1 above).
+2. In the left sidebar, open the **Plugins** menu, then **Downloads**.
+3. Click the layer you want — a new browser tab opens and the file
+   downloads:
+   - **Bronze DB** — raw data, straight from Dataverse.
+   - **Silver DB** — cleaned and prepared data.
+   - **Gold DB** — the dashboard-ready data (star schema).
+
+You must be logged into Airflow for the download to work. If a layer
+hasn't been built yet, you'll get a short "not produced yet" message
+instead of a file — run the jobs above first.
 
 ---
 

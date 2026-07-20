@@ -11,6 +11,8 @@ from airflow.providers.standard.operators.python import PythonOperator
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from igh_assets import gold_asset
+
 from config.settings import config
 
 default_args = {
@@ -113,7 +115,7 @@ with DAG(
     description="Deploy validated data to production database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=None,
+    schedule=[gold_asset] if config.deploy_auto_trigger else None,
     catchup=False,
     tags=["igh", "deployment", "production"],
 ) as dag:
