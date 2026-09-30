@@ -86,6 +86,11 @@ accepts the trigger but the run stays queued and never executes:
 docker compose exec airflow-apiserver airflow dags unpause igh_rollback
 ```
 
+**Pause `igh_deployment` before rolling back.** The two DAGs write the same
+three filenames, so a deploy landing mid-rollback can consume the retained
+version or immediately undo the rollback. `igh_deployment` is capped at one
+active run of its own (`max_active_runs=1`), but that cap does not span DAGs.
+
 Only one step back is available. The rollback consumes `.prev`, so a second
 rollback fails with `no star_schema.db.prev to roll back to` and changes
 nothing. To roll forward again, trigger `igh_deployment`, which re-uploads

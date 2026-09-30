@@ -22,7 +22,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from igh_deploy_remote import is_local_mode, rollback_command, run_remote, validate_deploy_config
 
-from config.settings import config
+# Read settings through the module, never by holding the ``config`` object:
+# reloading ``config.settings`` rebinds the singleton, and the guards in
+# igh_deploy_remote read the fresh one. A stale reference here would let the
+# boundary check validate a different config than the command is built from.
+from config import settings
 
 default_args = {
     "owner": "igh",
@@ -46,11 +50,11 @@ def rollback_remote_db(**context):
 
     validate_deploy_config()
 
-    logger.info(f"Rolling back DB on {config.deploy_target_host}")
-    run_remote(rollback_command(config.deploy_target_path), timeout=60)
+    logger.info(f"Rolling back DB on {settings.config.deploy_target_host}")
+    run_remote(rollback_command(settings.config.deploy_target_path), timeout=60)
 
     logger.info("Rollback completed; star_schema.db.prev is now live and has been consumed")
-    return {"status": "rolled_back", "host": config.deploy_target_host}
+    return {"status": "rolled_back", "host": settings.config.deploy_target_host}
 
 
 with DAG(
@@ -60,6 +64,10 @@ with DAG(
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
     schedule=None,
+    # One rollback at a time. Two concurrent runs can both pass the .prev
+    # check; the loser then dies on a coreutils message instead of the
+    # designed one, which is the last thing an operator needs mid-incident.
+    max_active_runs=1,
     catchup=False,
     tags=["igh", "rollback", "production"],
 ) as dag:

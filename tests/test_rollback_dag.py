@@ -112,3 +112,36 @@ def test_rollback_validates_deploy_config(monkeypatch):
 
     with pytest.raises(ValueError, match="DEPLOY_TARGET_USER"):
         rb.rollback_remote_db()
+
+
+def test_rollback_uses_the_current_config_after_a_settings_reload(monkeypatch):
+    """Same reload-safety requirement as the deployment DAG."""
+    import importlib
+
+    import config.settings
+    import dags.igh_rollback_dag as rb
+
+    importlib.reload(config.settings)
+    fresh = config.settings.config
+    monkeypatch.setattr(fresh, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(fresh, "deploy_target_user", "deployer")
+    monkeypatch.setattr(fresh, "deploy_target_path", "/srv/after/reload")
+
+    sent = {}
+    monkeypatch.setattr(rb, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    rb.rollback_remote_db()
+
+    assert "/srv/after/reload" in sent["command"]
+
+
+def test_rollback_allows_only_one_active_run():
+    """Two concurrent rollbacks can both pass the `.prev` guard.
+
+    The state stays correct either way -- the second `mv` simply finds
+    nothing -- but the loser dies on a coreutils message rather than the
+    designed "no star_schema.db.prev to roll back to", which is the last
+    thing an operator needs mid-incident.
+    """
+    from dags.igh_rollback_dag import dag
+
+    assert dag.max_active_runs == 1

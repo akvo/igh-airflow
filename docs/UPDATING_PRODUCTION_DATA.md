@@ -35,6 +35,12 @@ If you don't have either, ask the engineering team.
    - **2. IGH Transform**
    - **3. IGH Deployment**
 
+   You will also see a fourth entry, **4. IGH Rollback**. It is **not** a
+   fourth step, and it is not part of updating the data. It exists only to
+   undo a deployment that turned out to be wrong. Never run it as part of a
+   normal update — see [If the new data looks
+   wrong](#if-the-new-data-looks-wrong) below.
+
 ## Step 2 — Run the jobs in order
 
 You always start the **first** job yourself. The **second** job
@@ -47,7 +53,8 @@ and wait for it to finish before the next begins.
 > ⚠️ **Important:** always work in the numbered order, and wait for each
 > job to turn fully **dark green** before starting (or moving on to)
 > the next. Don't trigger **2. IGH Transform** by hand — it runs on its
-> own.
+> own. The numbered order stops at **3. IGH Deployment**; never run
+> **4. IGH Rollback** as the next step.
 
 To **start** a job (Ingestion and Deployment):
 
@@ -111,6 +118,26 @@ are dark green.
 
 If the numbers don't look updated, wait a minute and refresh once
 more. If they're still wrong, contact engineering (see below).
+
+## If the new data looks wrong
+
+The dashboard server keeps the **one** previous version of the data. If you
+finish an update and the dashboard is clearly wrong, it can be put back to
+how it was before:
+
+1. **Tell engineering first.** They will want to know what went wrong, and
+   the rollback only works once.
+2. If they ask you to do it, open **4. IGH Rollback** and start it the same
+   way you started job 1.
+3. Wait for it to turn **dark green**, then check the dashboard again.
+
+Two things to know:
+
+- **It only goes back one step.** Running it a second time does nothing and
+  will show an error — that is expected, not a new problem.
+- **It undoes the last deployment, not the last update.** Once you run a new
+  update, the old version is replaced and is no longer available to go back
+  to.
 
 ## If something goes wrong
 

@@ -148,3 +148,43 @@ def test_swap_skips_in_local_mode(monkeypatch):
     monkeypatch.setattr(dep, "run_remote", explode)
 
     assert dep.swap_remote_db() == {"status": "skipped", "reason": "local mode"}
+
+
+def test_deployment_allows_only_one_active_run():
+    """Concurrent deploys destroy the retained version.
+
+    Two interleaved runs can both pass the `.new` guard; the second's `ln`
+    then makes `.prev` and the live DB the same inode, after which rollback
+    fails with a coreutils "are the same file" error instead of either
+    designed message, and the operator cannot roll back until the next
+    deploy resets `.prev`.
+    """
+    from dags.igh_deployment_dag import dag
+
+    assert dag.max_active_runs == 1
+
+
+def test_swap_uses_the_current_config_after_a_settings_reload(monkeypatch):
+    """Reloading config.settings rebinds the singleton; the DAG must follow it.
+
+    is_local_mode() and validate_deploy_config() live in the helper and read
+    the fresh object. If this module kept a stale reference, those guards
+    would validate one config while swap_command() was built from another --
+    the boundary check would stop guarding the value actually used.
+    """
+    import importlib
+
+    import config.settings
+    import dags.igh_deployment_dag as dep
+
+    importlib.reload(config.settings)
+    fresh = config.settings.config
+    monkeypatch.setattr(fresh, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(fresh, "deploy_target_user", "deployer")
+    monkeypatch.setattr(fresh, "deploy_target_path", "/srv/after/reload")
+
+    sent = {}
+    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    dep.swap_remote_db()
+
+    assert "/srv/after/reload" in sent["command"]

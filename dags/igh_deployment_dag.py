@@ -14,7 +14,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from igh_assets import gold_asset
 from igh_deploy_remote import is_local_mode, run_remote, swap_command, validate_deploy_config
 
-from config.settings import config
+# Read settings through the module, never by holding the ``config`` object:
+# reloading ``config.settings`` rebinds the singleton, and the guards in
+# igh_deploy_remote read the fresh one. A stale reference here would let the
+# boundary check validate a different config than the command is built from.
+from config import settings
 
 default_args = {
     "owner": "igh",
@@ -36,15 +40,15 @@ def scp_gold_db(**context):
 
     validate_deploy_config()
 
-    gold_path = Path(config.gold_db_path)
+    gold_path = Path(settings.config.gold_db_path)
     if not gold_path.exists():
         raise FileNotFoundError(f"Gold database not found: {gold_path}")
 
-    target = f"{config.deploy_target_user}@{config.deploy_target_host}:{config.deploy_target_path}/star_schema.db.new"
+    target = f"{settings.config.deploy_target_user}@{settings.config.deploy_target_host}:{settings.config.deploy_target_path}/star_schema.db.new"
     cmd = [
         "scp",
         "-i",
-        config.deploy_ssh_key_path,
+        settings.config.deploy_ssh_key_path,
         "-o",
         "StrictHostKeyChecking=accept-new",
         str(gold_path),
@@ -72,11 +76,11 @@ def swap_remote_db(**context):
 
     validate_deploy_config()
 
-    logger.info(f"Swapping DB on {config.deploy_target_host}")
-    run_remote(swap_command(config.deploy_target_path), timeout=60)
+    logger.info(f"Swapping DB on {settings.config.deploy_target_host}")
+    run_remote(swap_command(settings.config.deploy_target_path), timeout=60)
 
     logger.info("Remote DB swap completed successfully; previous version kept as star_schema.db.prev")
-    return {"status": "deployed", "host": config.deploy_target_host}
+    return {"status": "deployed", "host": settings.config.deploy_target_host}
 
 
 with DAG(
@@ -85,7 +89,12 @@ with DAG(
     description="Deploy validated data to production database",
     default_args=default_args,
     start_date=datetime(2024, 1, 1),
-    schedule=[gold_asset] if config.deploy_auto_trigger else None,
+    schedule=[gold_asset] if settings.config.deploy_auto_trigger else None,
+    # One deploy at a time. Two interleaved runs can both pass the .new guard;
+    # the second's `ln` then points .prev at the same inode as the live DB, and
+    # rollback afterwards fails with "are the same file" instead of either
+    # designed message -- the operator cannot roll back until the next deploy.
+    max_active_runs=1,
     catchup=False,
     tags=["igh", "deployment", "production"],
 ) as dag:
