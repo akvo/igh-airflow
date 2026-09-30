@@ -25,22 +25,26 @@ from pathlib import Path
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import config
+# Import the module, not the ``config`` object: the test suite reloads
+# ``config.settings`` (to re-read DEPLOY_AUTO_TRIGGER at DAG-parse time), which
+# rebinds the singleton. A module holding a direct reference would keep reading
+# the pre-reload object forever.
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def is_local_mode():
     """True when there is no real dashboard server to publish to (dev mode)."""
-    return config.deploy_target_host in ("local", "")
+    return settings.config.deploy_target_host in ("local", "")
 
 
 def validate_deploy_config():
     """Raise if required deploy settings are missing."""
     missing = []
-    if not config.deploy_target_user:
+    if not settings.config.deploy_target_user:
         missing.append("DEPLOY_TARGET_USER")
-    if not config.deploy_target_path:
+    if not settings.config.deploy_target_path:
         missing.append("DEPLOY_TARGET_PATH")
     if missing:
         raise ValueError(f"Missing required deploy config: {', '.join(missing)}")
@@ -103,14 +107,14 @@ def run_remote(command, timeout=60):
     cmd = [
         "ssh",
         "-i",
-        config.deploy_ssh_key_path,
+        settings.config.deploy_ssh_key_path,
         "-o",
         "StrictHostKeyChecking=accept-new",
-        f"{config.deploy_target_user}@{config.deploy_target_host}",
+        f"{settings.config.deploy_target_user}@{settings.config.deploy_target_host}",
         command,
     ]
 
-    logger.info("Running on %s: %s", config.deploy_target_host, command)
+    logger.info("Running on %s: %s", settings.config.deploy_target_host, command)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError(f"Remote command failed (rc={result.returncode}): {result.stderr.strip()}")

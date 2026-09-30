@@ -12,6 +12,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from igh_assets import gold_asset
+from igh_deploy_remote import is_local_mode, run_remote, swap_command, validate_deploy_config
 
 from config.settings import config
 
@@ -23,32 +24,17 @@ default_args = {
 }
 
 
-def _is_local_mode():
-    return config.deploy_target_host in ("local", "")
-
-
-def _validate_deploy_config():
-    """Raise if required deploy settings are missing."""
-    missing = []
-    if not config.deploy_target_user:
-        missing.append("DEPLOY_TARGET_USER")
-    if not config.deploy_target_path:
-        missing.append("DEPLOY_TARGET_PATH")
-    if missing:
-        raise ValueError(f"Missing required deploy config: {', '.join(missing)}")
-
-
 def scp_gold_db(**context):
     """SCP the gold star-schema database to the remote server."""
     import logging
 
     logger = logging.getLogger(__name__)
 
-    if _is_local_mode():
+    if is_local_mode():
         logger.warning("Skipping SCP — DEPLOY_TARGET_HOST is 'local' (dev mode)")
         return {"status": "skipped", "reason": "local mode"}
 
-    _validate_deploy_config()
+    validate_deploy_config()
 
     gold_path = Path(config.gold_db_path)
     if not gold_path.exists():
@@ -75,37 +61,21 @@ def scp_gold_db(**context):
 
 
 def swap_remote_db(**context):
-    """Atomically swap star_schema.db.new to star_schema.db on the remote server."""
+    """Publish the uploaded gold DB, keeping the previous version as .prev."""
     import logging
 
     logger = logging.getLogger(__name__)
 
-    if _is_local_mode():
+    if is_local_mode():
         logger.warning("Skipping swap — DEPLOY_TARGET_HOST is 'local' (dev mode)")
         return {"status": "skipped", "reason": "local mode"}
 
-    _validate_deploy_config()
-
-    # mv on the same filesystem is atomic and changes the inode, which
-    # triggers the dashboard backend's hot-reload (DatabaseManager detects
-    # inode changes and reconnects automatically).
-    swap_cmd = f"mv {config.deploy_target_path}/star_schema.db.new {config.deploy_target_path}/star_schema.db"
-    cmd = [
-        "ssh",
-        "-i",
-        config.deploy_ssh_key_path,
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        f"{config.deploy_target_user}@{config.deploy_target_host}",
-        swap_cmd,
-    ]
+    validate_deploy_config()
 
     logger.info(f"Swapping DB on {config.deploy_target_host}")
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    if result.returncode != 0:
-        raise RuntimeError(f"SSH swap failed (rc={result.returncode}): {result.stderr}")
+    run_remote(swap_command(config.deploy_target_path), timeout=60)
 
-    logger.info("Remote DB swap completed successfully")
+    logger.info("Remote DB swap completed successfully; previous version kept as star_schema.db.prev")
     return {"status": "deployed", "host": config.deploy_target_host}
 
 

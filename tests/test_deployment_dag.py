@@ -90,3 +90,61 @@ def test_task_ordering():
     scp_task = dag.get_task("scp_gold_db")
     downstream_ids = [t.task_id for t in scp_task.downstream_list]
     assert "swap_remote_db" in downstream_ids
+
+
+def test_swap_sends_the_shared_swap_command(monkeypatch):
+    """The DAG must delegate to swap_command, not hand-roll a command string."""
+    import dags.igh_deployment_dag as dep
+    from config.settings import config
+    from dags.igh_deploy_remote import swap_command
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
+
+    sent = {}
+    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+
+    result = dep.swap_remote_db()
+
+    assert sent["command"] == swap_command("/srv/dashboard/data")
+    assert result["status"] == "deployed"
+
+
+def test_swap_checks_new_before_touching_the_live_db(monkeypatch):
+    """Review Focus 1, pinned at the DAG boundary too.
+
+    A future edit could reorder the command's clauses and still pass the
+    protocol tests by regenerating both sides, so assert the ordering here
+    against the literal filenames.
+    """
+    import dags.igh_deployment_dag as dep
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
+
+    sent = {}
+    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    dep.swap_remote_db()
+    command = sent["command"]
+
+    guard = command.index("[ -f star_schema.db.new ]")
+    aside = command.index("ln -f star_schema.db star_schema.db.prev")
+    swap = command.index("mv -f star_schema.db.new star_schema.db")
+    assert guard < aside < swap
+
+
+def test_swap_skips_in_local_mode(monkeypatch):
+    import dags.igh_deployment_dag as dep
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "local")
+
+    def explode(*args, **kwargs):
+        raise AssertionError("run_remote must not be called in local mode")
+
+    monkeypatch.setattr(dep, "run_remote", explode)
+
+    assert dep.swap_remote_db() == {"status": "skipped", "reason": "local mode"}
