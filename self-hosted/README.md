@@ -69,6 +69,31 @@ start).
 
 ## Operations
 
+### Roll back a bad gold database
+
+The dashboard server keeps the previous gold database as
+`star_schema.db.prev`. To restore it, trigger the `4. IGH Rollback` DAG from
+the UI, or:
+
+```bash
+docker compose exec airflow-apiserver airflow dags trigger igh_rollback
+```
+
+**Unpause `igh_rollback` once after first deploying it** — a paused DAG
+accepts the trigger but the run stays queued and never executes:
+
+```bash
+docker compose exec airflow-apiserver airflow dags unpause igh_rollback
+```
+
+Only one step back is available. The rollback consumes `.prev`, so a second
+rollback fails with `no star_schema.db.prev to roll back to` and changes
+nothing. To roll forward again, trigger `igh_deployment`, which re-uploads
+from the local gold database.
+
+Disk: the deploy directory holds two gold databases at rest and three
+momentarily during a deploy.
+
 ### Update (pull, rebuild, restart)
 
 ```bash

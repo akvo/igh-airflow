@@ -86,6 +86,7 @@ igh_ingestion (manual)          sync_dataverse        -> Asset: igh_bronze_db
 igh_transform (on igh_bronze_db) bronze_to_silver     -> Asset: igh_silver_db
                                  silver_to_gold        -> Asset: igh_gold_db
 igh_deployment (manual or on igh_gold_db) scp_gold_db >> swap_remote_db
+igh_rollback (manual only)      rollback_remote_db
 ```
 
 ### Project Structure
@@ -96,6 +97,8 @@ igh-airflow/
 │   ├── igh_ingestion_dag.py # Dataverse sync using igh-data-sync
 │   ├── igh_transform_dag.py # Bronze→Silver→Gold
 │   ├── igh_deployment_dag.py # Production deployment
+│   ├── igh_rollback_dag.py  # Restore the previous gold DB on the dashboard
+│   ├── igh_deploy_remote.py # Shared SSH publish protocol + command builders
 │   └── igh_assets.py        # Shared Asset definitions (trigger baton)
 ├── plugins/                 # Airflow plugins
 │   └── igh_download_plugin.py # Authenticated layer-DB download endpoint
@@ -132,6 +135,24 @@ iframe (no `allow-downloads`) that blocks the download, so plain menu links
 are used instead; and Airflow renders plugin menu items as real links only
 when there are at least two, so all three layers are listed (a single item
 collapses into a non-navigating button).
+
+### Gold DB Retention and Rollback
+
+The dashboard server keeps one previous gold database. `swap_remote_db`
+hardlinks the outgoing `star_schema.db` to `star_schema.db.prev` before the
+atomic rename that publishes `star_schema.db.new`, and `igh_rollback`
+renames `.prev` back over the live file.
+
+Both commands check their precondition *before* mutating anything, so a
+swap with no `.new` (which is the state after every successful deploy) and a
+second rollback with no `.prev` both fail loudly and leave the directory
+untouched. Rolling forward after a rollback is an ordinary `igh_deployment`
+run — the abandoned version is not retained remotely.
+
+`igh_rollback` is manual-trigger only. Because
+`DAGS_ARE_PAUSED_AT_CREATION` is `true`, **unpause it once after deploying**:
+a paused DAG accepts a trigger but its run sits queued, which is not what
+you want to discover during an incident.
 
 ## Configuration
 
