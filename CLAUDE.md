@@ -72,6 +72,70 @@ docker compose down
 docker compose --profile flower up -d
 ```
 
+### Simulating the dashboard server
+
+The deploy and rollback DAGs talk to a remote machine over SSH, so the only
+way to exercise them for real is against an SSH host. The `dashboard-sim`
+profile provides a throwaway one on the compose network — an `alpine` +
+`openssh` container. It is behind a profile, so a plain `docker compose up -d`
+never starts it.
+
+```bash
+# 1. Generate the throwaway keypair FIRST. If you start the stack before
+#    ./ssh exists, Docker creates it root-owned and ssh-keygen then fails.
+mkdir -p ssh && ssh-keygen -t ed25519 -f ssh/id_rsa -N "" -q && chmod 600 ssh/id_rsa
+
+# 2. A gold DB to deploy. Use a real one if you have it; a stand-in is
+#    otherwise fine, since the swap and rollback never read the contents.
+mkdir -p data/gold
+uv run python -c "import sqlite3; sqlite3.connect('data/gold/star_schema.db').execute('create table t(x)')"
+
+# 3. Start the stack together with the simulated dashboard server.
+DEPLOY_TARGET_HOST=dashboard-sim \
+DEPLOY_TARGET_USER=deployer \
+DEPLOY_TARGET_PATH=/srv/dashboard \
+  docker compose --profile dashboard-sim up -d
+
+# 4. Unpause the DAGs you want to drive.
+docker compose exec airflow-apiserver airflow dags unpause igh_deployment
+docker compose exec airflow-apiserver airflow dags unpause igh_rollback
+```
+
+Inspect the simulated deploy directory at any point — `-i` shows inodes,
+which is how you confirm the retention is a hardlink and not a copy:
+
+```bash
+docker compose exec dashboard-sim sh -c 'cd /srv/dashboard && ls -li star_schema.db*'
+```
+
+What each step should produce:
+
+| Action | Expected state |
+|--------|----------------|
+| Trigger `igh_deployment` (first time) | `star_schema.db` only — no `.prev` |
+| Change the gold DB, trigger again | live is the new version; `.prev` holds the old one **at the inode the live file had before** |
+| Trigger `igh_rollback` | live is the old version again, `.prev` gone |
+| Trigger `igh_rollback` a second time | task **fails**: `no star_schema.db.prev to roll back to`; directory unchanged |
+| Clear only `swap_remote_db` and let it rerun | task **fails**: `no star_schema.db.new to deploy`; **live DB still intact** |
+
+That last row is the one worth re-running after any change to the swap
+command: it is the case where a set-aside-then-swap ordering would leave the
+dashboard with no database at all.
+
+Two things that will trip you up:
+
+- The key must be readable by the container user. `.env` sets
+  `AIRFLOW_UID=1000`; if that does not match the owner of `ssh/id_rsa`, `ssh`
+  rejects the key.
+- `swap_remote_db` inherits `retries: 1` with a 5-minute delay, so a cleared
+  swap task sits in `up_for_retry` for five minutes before it goes red. The
+  failure itself is immediate — check the task log rather than waiting on the
+  final state.
+
+The sim's login shell is busybox `ash`, not bash, so a passing run also
+confirms the command strings are portable POSIX shell — which is what `ssh`
+hands to whatever login shell the real dashboard server runs.
+
 ## Architecture
 
 ### DAG Pipeline
@@ -148,6 +212,9 @@ swap with no `.new` (which is the state after every successful deploy) and a
 second rollback with no `.prev` both fail loudly and leave the directory
 untouched. Rolling forward after a rollback is an ordinary `igh_deployment`
 run — the abandoned version is not retained remotely.
+
+To exercise this workflow for real without a remote machine, see
+[Simulating the dashboard server](#simulating-the-dashboard-server).
 
 `igh_rollback` is manual-trigger only. Because
 `DAGS_ARE_PAUSED_AT_CREATION` is `true`, **unpause it once after deploying**:

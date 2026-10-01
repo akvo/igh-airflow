@@ -29,14 +29,20 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    # IGH deployment: "local" skips SCP/SSH in dev mode
+    # IGH deployment: "local" skips SCP/SSH in dev mode. Point DEPLOY_TARGET_HOST
+    # at the dashboard-sim service to exercise the real deploy/rollback workflow
+    # against a throwaway SSH host -- see CLAUDE.md.
     DEPLOY_TARGET_HOST: ${DEPLOY_TARGET_HOST:-local}
+    DEPLOY_TARGET_USER: ${DEPLOY_TARGET_USER:-}
+    DEPLOY_TARGET_PATH: ${DEPLOY_TARGET_PATH:-}
+    DEPLOY_SSH_KEY_PATH: ${DEPLOY_SSH_KEY_PATH:-/opt/airflow/ssh/id_rsa}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    - ${AIRFLOW_PROJ_DIR:-.}/ssh:/opt/airflow/ssh:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     redis:
@@ -222,6 +228,27 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
+  # Throwaway SSH host standing in for the dashboard server, so the deploy and
+  # rollback DAGs can be exercised end to end without a real remote machine.
+  # Behind a profile, so `docker compose up -d` never starts it:
+  #   docker compose --profile dashboard-sim up -d
+  dashboard-sim:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard-sim
+    image: igh-dashboard-sim:latest
+    profiles:
+      - dashboard-sim
+    volumes:
+      # Public half of the keypair generated into ./ssh; installed as
+      # authorized_keys at startup.
+      - ${AIRFLOW_PROJ_DIR:-.}/ssh:/keys:ro
+    healthcheck:
+      test: ["CMD", "pgrep", "sshd"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
 
 volumes:
   postgres-db-volume:

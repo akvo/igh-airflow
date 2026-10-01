@@ -63,3 +63,6 @@ data/
 
 # Claude local configs
 .claude/*.local.*
+
+# Throwaway SSH keypair for the dashboard-sim dev profile (never commit keys)
+ssh/
