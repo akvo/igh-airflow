@@ -85,12 +85,31 @@ def test_swap_without_new_leaves_live_db_untouched(tmp_path):
     assert _state(tmp_path) == before
 
 
-def test_swap_hardlinks_rather_than_copying(tmp_path):
-    """.prev must be the same inode as the outgoing live DB.
+def test_swap_reports_whether_it_retained_a_previous_version(tmp_path):
+    """The DAG logs "rollback is available" off this, so it must be truthful.
 
-    This proves two things at once: nothing is copied (so runtime is
-    independent of database size), and the live path was never unlinked to
-    create the aside.
+    On a first deploy there is nothing to set aside, and claiming otherwise
+    tells an operator a rollback exists when it does not.
+    """
+
+    def stdout_of(command):
+        return subprocess.run(["bash", "-c", command], capture_output=True, text=True, check=True).stdout
+
+    (tmp_path / "star_schema.db.new").write_text("v1")
+    assert "retained-prev" not in stdout_of(swap_command(tmp_path))
+
+    (tmp_path / "star_schema.db.new").write_text("v2")
+    assert "retained-prev" in stdout_of(swap_command(tmp_path))
+
+
+def test_swap_hardlinks_rather_than_copying(tmp_path):
+    """.prev must be the same inode as the outgoing live DB, so nothing is copied.
+
+    This pins only that: runtime stays independent of database size. It does
+    *not* prove the live path was never unlinked -- an `mv`-based aside would
+    also preserve the inode and pass. The clause ordering is what guarantees
+    that, and `test_swap_without_new_leaves_live_db_untouched` is what proves
+    the consequence that matters.
     """
     live = tmp_path / "star_schema.db"
     live.write_text("v1")

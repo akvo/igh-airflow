@@ -77,10 +77,24 @@ def swap_remote_db(**context):
     validate_deploy_config()
 
     logger.info(f"Swapping DB on {settings.config.deploy_target_host}")
-    run_remote(swap_command(settings.config.deploy_target_path), timeout=60)
+    result = run_remote(swap_command(settings.config.deploy_target_path), timeout=60)
 
-    logger.info("Remote DB swap completed successfully; previous version kept as star_schema.db.prev")
-    return {"status": "deployed", "host": settings.config.deploy_target_host}
+    # Only say a rollback is available when one actually is: a first-ever
+    # deploy has no previous version to set aside, and claiming otherwise
+    # would send an operator to igh_rollback for nothing.
+    retained_previous = "retained-prev" in result.stdout
+    logger.info(
+        "Remote DB swap completed; %s",
+        "previous version kept as star_schema.db.prev"
+        if retained_previous
+        else "no previous version existed to retain (first deploy)",
+    )
+
+    return {
+        "status": "deployed",
+        "host": settings.config.deploy_target_host,
+        "retained_previous": retained_previous,
+    }
 
 
 with DAG(

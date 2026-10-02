@@ -2,8 +2,24 @@
 
 import importlib
 import os
+import subprocess
 
 import pytest
+
+
+def _fake_run_remote(sent, stdout=""):
+    """Stand-in for run_remote that records the command and mimics its return.
+
+    run_remote hands back a CompletedProcess, and swap_remote_db reads its
+    stdout to tell whether a previous version was retained, so a double that
+    returns None would pass here and fail against the real thing.
+    """
+
+    def run(command, **kwargs):
+        sent["command"] = command
+        return subprocess.CompletedProcess(["ssh"], 0, stdout=stdout, stderr="")
+
+    return run
 
 
 @pytest.fixture(autouse=True)
@@ -103,20 +119,28 @@ def test_swap_sends_the_shared_swap_command(monkeypatch):
     monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
 
     sent = {}
-    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent, stdout="retained-prev\n"))
 
     result = dep.swap_remote_db()
 
     assert sent["command"] == swap_command("/srv/dashboard/data")
     assert result["status"] == "deployed"
+    assert result["retained_previous"] is True
 
-    # The clause order is the safety property, so pin it at the DAG boundary
-    # too: regenerating both sides of the equality above would not catch a
-    # reordering. The executing test in test_deploy_remote.py is the stronger
-    # guard; this one costs three lines on setup that already exists.
-    guard = sent["command"].index("[ -f star_schema.db.new ]")
-    aside = sent["command"].index("ln -f star_schema.db star_schema.db.prev")
-    swap = sent["command"].index("mv -f star_schema.db.new star_schema.db")
+    # A first deploy retains nothing, and must not claim a rollback exists.
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent, stdout=""))
+    assert dep.swap_remote_db()["retained_previous"] is False
+
+    # Clause order documented at the DAG boundary. The chaining operators are
+    # deliberately not asserted: the guard's own `exit 1` is what stops the
+    # mutation, so swapping `&&` for `;` after it changes nothing (measured).
+    # What does matter is that `exit 1` staying there, and removing it IS
+    # caught -- test_swap_without_new_leaves_live_db_untouched runs the real
+    # command and sees star_schema.db.prev appear.
+    command = sent["command"]
+    guard = command.index("[ -f star_schema.db.new ]")
+    aside = command.index("ln -f star_schema.db star_schema.db.prev")
+    swap = command.index("mv -f star_schema.db.new star_schema.db")
     assert guard < aside < swap
 
 
@@ -168,7 +192,7 @@ def test_swap_uses_the_current_config_after_a_settings_reload(monkeypatch):
     monkeypatch.setattr(fresh, "deploy_target_path", "/srv/after/reload")
 
     sent = {}
-    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent))
     dep.swap_remote_db()
 
     assert "/srv/after/reload" in sent["command"]

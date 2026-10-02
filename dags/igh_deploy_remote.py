@@ -87,13 +87,16 @@ def swap_command(remote_path):
     which is what triggers the dashboard backend's hot-reload.
 
     The ``[ ! -f star_schema.db ]`` branch lets the first-ever deploy through
-    -- there is nothing to set aside, so no ``.prev`` is created.
+    -- there is nothing to set aside, so no ``.prev`` is created. In that case
+    nothing is printed; otherwise the command echoes ``retained-prev``, which
+    is how the caller knows whether a rollback is now available rather than
+    having to assume one is.
     """
     p = shlex.quote(str(remote_path))
     return (
         f"cd {p} "
         f'&& {{ [ -f star_schema.db.new ] || {{ echo "no star_schema.db.new to deploy" >&2; exit 1; }}; }} '
-        f"&& {{ [ ! -f star_schema.db ] || ln -f star_schema.db star_schema.db.prev; }} "
+        f"&& {{ [ ! -f star_schema.db ] || {{ ln -f star_schema.db star_schema.db.prev && echo retained-prev; }}; }} "
         f"&& mv -f star_schema.db.new star_schema.db"
     )
 
