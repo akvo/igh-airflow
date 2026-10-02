@@ -1,0 +1,41 @@
+# Simulated dashboard server, for exercising the gold DB deploy and rollback
+# workflow without a real remote host. Development and testing only -- this
+# image is never deployed anywhere.
+#
+# Built on the official alpine image plus Alpine's own signed openssh package.
+# There is no Docker Official Image for an SSH server, so this is the shortest
+# trust chain available: one official base, one distro-signed package, no
+# third-party image layer.
+#
+# The login shell is busybox ash, not bash. That is deliberate -- it means a
+# successful run also proves the deploy and rollback command strings are
+# portable POSIX shell, which is what `ssh host "<command>"` actually hands to
+# whatever login shell the real dashboard server uses.
+FROM alpine:3
+
+# `adduser -D` leaves the account password-locked (`deployer:!`), and sshd then
+# refuses it even for key auth -- measured: `!` gives "Permission denied
+# (publickey)", while `*` and an empty password both authenticate. `*` is used
+# rather than `passwd -d` because it means "no password login is possible", so
+# turning password auth on later still could not log in as this user.
+RUN apk add --no-cache openssh-server \
+    && adduser -D -h /home/deployer deployer \
+    && sed -i 's/^deployer:!/deployer:*/' /etc/shadow \
+    && mkdir -p /srv/dashboard /home/deployer/.ssh \
+    && chown -R deployer:deployer /srv/dashboard /home/deployer/.ssh \
+    && chmod 700 /home/deployer/.ssh
+
+# PermitEmptyPasswords is already off by default, so it is not repeated here.
+RUN printf '\nPermitRootLogin no\nPasswordAuthentication no\nPubkeyAuthentication yes\n' >> /etc/ssh/sshd_config \
+    && ssh-keygen -A \
+    && /usr/sbin/sshd -t
+
+EXPOSE 22
+
+# authorized_keys is installed at startup rather than baked in, so the keypair
+# can be regenerated without rebuilding the image.
+CMD ["/bin/sh", "-c", "set -e; \
+cp /keys/id_rsa.pub /home/deployer/.ssh/authorized_keys; \
+chown deployer:deployer /home/deployer/.ssh/authorized_keys; \
+chmod 600 /home/deployer/.ssh/authorized_keys; \
+exec /usr/sbin/sshd -D -e"]

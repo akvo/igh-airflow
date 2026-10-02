@@ -55,12 +55,19 @@ docker compose up -d
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   igh_ingestion │───▶│  igh_transform  │───▶│ igh_deployment  │
-│  (manual only)  │    │  (manual only)  │    │  (manual only)  │
+│  (manual only)  │    │  (on bronze)    │    │ (manual/on gold)│
 └─────────────────┘    └─────────────────┘    └─────────────────┘
         │                      │                      │
         ▼                      ▼                      ▼
    Dataverse            Bronze → Silver        Gold → Production
-   → Bronze             Silver → Gold          (atomic swap)
+   → Bronze             Silver → Gold          (atomic swap, keeps .prev)
+                                                      │
+                                                      ▼
+                                              ┌─────────────────┐
+                                              │  igh_rollback   │
+                                              │  (manual only)  │
+                                              └─────────────────┘
+                                               restore .prev
 ```
 
 ### DAG Details
@@ -69,7 +76,8 @@ docker compose up -d
 |-----|-------|-------------|
 | `igh_ingestion` | 1 | Sync Dataverse to Bronze DB |
 | `igh_transform` | 2 | Transform Bronze→Silver→Gold |
-| `igh_deployment` | 1 | Deploy to production with atomic swap |
+| `igh_deployment` | 2 | Upload gold DB, then atomic swap keeping `.prev` |
+| `igh_rollback` | 1 | Restore `star_schema.db.prev` on the dashboard server |
 
 ## Project Structure
 
@@ -79,7 +87,9 @@ igh-airflow/
 │   ├── __init__.py
 │   ├── igh_ingestion_dag.py    # Dataverse sync
 │   ├── igh_transform_dag.py    # Bronze→Silver→Gold transforms
-│   └── igh_deployment_dag.py   # Production deployment
+│   ├── igh_deployment_dag.py   # Production deployment
+│   ├── igh_rollback_dag.py     # Restore the previous gold DB
+│   └── igh_deploy_remote.py    # Shared SSH publish protocol
 ├── config/
 │   ├── __init__.py
 │   └── settings.py             # PipelineConfig dataclass
@@ -88,7 +98,9 @@ igh-airflow/
 │   ├── conftest.py
 │   ├── test_ingestion_dag.py
 │   ├── test_transform_dag.py
-│   └── test_deployment_dag.py
+│   ├── test_deployment_dag.py
+│   ├── test_rollback_dag.py
+│   └── test_deploy_remote.py
 ├── docker/
 │   ├── Dockerfile              # Production image
 │   └── entrypoint.sh

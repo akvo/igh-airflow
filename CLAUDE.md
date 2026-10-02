@@ -72,6 +72,75 @@ docker compose down
 docker compose --profile flower up -d
 ```
 
+### Simulating the dashboard server
+
+The deploy and rollback DAGs talk to a remote machine over SSH, so the only
+way to exercise them for real is against an SSH host. The `dashboard-sim`
+profile provides a throwaway one on the compose network — an `alpine` +
+`openssh` container. It is behind a profile, so a plain `docker compose up -d`
+never starts it.
+
+```bash
+# 1. Generate the throwaway keypair FIRST. If you start the stack before
+#    ./ssh exists, Docker creates it root-owned and ssh-keygen then fails.
+mkdir -p ssh && ssh-keygen -t ed25519 -f ssh/id_rsa -N "" -q && chmod 600 ssh/id_rsa
+
+# 2. A gold DB to deploy. Use a real one if you have it; a stand-in is
+#    otherwise fine, since the swap and rollback never read the contents.
+mkdir -p data/gold
+uv run python -c "import sqlite3; sqlite3.connect('data/gold/star_schema.db').execute('create table t(x)')"
+
+# 3. Start the stack together with the simulated dashboard server.
+DEPLOY_TARGET_HOST=dashboard-sim \
+DEPLOY_TARGET_USER=deployer \
+DEPLOY_TARGET_PATH=/srv/dashboard \
+  docker compose --profile dashboard-sim up -d
+
+# 4. Unpause the DAGs you want to drive.
+docker compose exec airflow-apiserver airflow dags unpause igh_deployment
+docker compose exec airflow-apiserver airflow dags unpause igh_rollback
+```
+
+Inspect the simulated deploy directory at any point — `-i` shows inodes,
+which is how you confirm the retention is a hardlink and not a copy:
+
+```bash
+docker compose exec dashboard-sim sh -c 'cd /srv/dashboard && ls -li star_schema.db*'
+```
+
+What each step should produce:
+
+| Action | Expected state |
+|--------|----------------|
+| Trigger `igh_deployment` (first time) | `star_schema.db` only — no `.prev` |
+| Change the gold DB, trigger again | live is the new version; `.prev` holds the old one **at the inode the live file had before** |
+| Trigger `igh_rollback` | live is the old version again, `.prev` gone |
+| Trigger `igh_rollback` a second time | task is **skipped** (not red), log says `NO ROLLBACK PERFORMED`; directory unchanged |
+| Clear only `swap_remote_db` and let it rerun | task **fails**: `no star_schema.db.new to deploy`; **live DB still intact** |
+
+That last row is the one worth re-running after any change to the swap
+command: it is the case where a set-aside-then-swap ordering would leave the
+dashboard with no database at all.
+
+Two things that will trip you up:
+
+- The key must be readable by the container user. `.env` sets
+  `AIRFLOW_UID=1000`; if that does not match the owner of `ssh/id_rsa`, `ssh`
+  rejects the key.
+- Rebuilding `dashboard-sim` regenerates its SSH host keys, and the deploy
+  tasks use `StrictHostKeyChecking=accept-new`, which accepts an unknown host
+  but refuses a *changed* one. After a rebuild the tasks fail with `Host key
+  verification failed` until the worker's cached entry is dropped:
+  `docker compose up -d --force-recreate airflow-worker`.
+- `swap_remote_db` inherits `retries: 1` with a 5-minute delay, so a cleared
+  swap task sits in `up_for_retry` for five minutes before it goes red. The
+  failure itself is immediate — check the task log rather than waiting on the
+  final state.
+
+The sim's login shell is busybox `ash`, not bash, so a passing run also
+confirms the command strings are portable POSIX shell — which is what `ssh`
+hands to whatever login shell the real dashboard server runs.
+
 ## Architecture
 
 ### DAG Pipeline
@@ -86,6 +155,7 @@ igh_ingestion (manual)          sync_dataverse        -> Asset: igh_bronze_db
 igh_transform (on igh_bronze_db) bronze_to_silver     -> Asset: igh_silver_db
                                  silver_to_gold        -> Asset: igh_gold_db
 igh_deployment (manual or on igh_gold_db) scp_gold_db >> swap_remote_db
+igh_rollback (manual only)      rollback_remote_db
 ```
 
 ### Project Structure
@@ -96,6 +166,8 @@ igh-airflow/
 │   ├── igh_ingestion_dag.py # Dataverse sync using igh-data-sync
 │   ├── igh_transform_dag.py # Bronze→Silver→Gold
 │   ├── igh_deployment_dag.py # Production deployment
+│   ├── igh_rollback_dag.py  # Restore the previous gold DB on the dashboard
+│   ├── igh_deploy_remote.py # Shared SSH publish protocol + command builders
 │   └── igh_assets.py        # Shared Asset definitions (trigger baton)
 ├── plugins/                 # Airflow plugins
 │   └── igh_download_plugin.py # Authenticated layer-DB download endpoint
@@ -132,6 +204,40 @@ iframe (no `allow-downloads`) that blocks the download, so plain menu links
 are used instead; and Airflow renders plugin menu items as real links only
 when there are at least two, so all three layers are listed (a single item
 collapses into a non-navigating button).
+
+### Gold DB Retention and Rollback
+
+The dashboard server keeps one previous gold database. `swap_remote_db`
+hardlinks the outgoing `star_schema.db` to `star_schema.db.prev` before the
+atomic rename that publishes `star_schema.db.new`, and `igh_rollback`
+renames `.prev` back over the live file.
+
+Both commands check their precondition *before* mutating anything, so
+neither can leave a half-applied state. They report differently on purpose:
+
+- A **second rollback** with no `.prev` is reported as a **skipped** task,
+  not a failure. Having nothing to undo is the normal state after any
+  rollback and cannot be fixed until the next deploy, so red would be telling
+  the operator to repair something that is not broken. The guard exits with
+  `NOTHING_TO_ROLL_BACK` (3) and the task logs `NO ROLLBACK PERFORMED`. Note
+  the *DAG run* still shows success — check the task tile, not the run.
+- A **swap** with no `.new` stays **red**. The upload not landing where it
+  should have is genuinely anomalous and worth an engineer's attention.
+
+Any other non-zero exit — unreachable host, permission denied — is red in
+both DAGs. The skip is matched on that one exit code alone, never on the
+error text.
+
+Rolling forward after a rollback is an ordinary `igh_deployment`
+run — the abandoned version is not retained remotely.
+
+To exercise this workflow for real without a remote machine, see
+[Simulating the dashboard server](#simulating-the-dashboard-server).
+
+`igh_rollback` is manual-trigger only. Because
+`DAGS_ARE_PAUSED_AT_CREATION` is `true`, **unpause it once after deploying**:
+a paused DAG accepts a trigger but its run sits queued, which is not what
+you want to discover during an incident.
 
 ## Configuration
 

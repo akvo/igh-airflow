@@ -2,8 +2,24 @@
 
 import importlib
 import os
+import subprocess
 
 import pytest
+
+
+def _fake_run_remote(sent, stdout=""):
+    """Stand-in for run_remote that records the command and mimics its return.
+
+    run_remote hands back a CompletedProcess, and swap_remote_db reads its
+    stdout to tell whether a previous version was retained, so a double that
+    returns None would pass here and fail against the real thing.
+    """
+
+    def run(command, **kwargs):
+        sent["command"] = command
+        return subprocess.CompletedProcess(["ssh"], 0, stdout=stdout, stderr="")
+
+    return run
 
 
 @pytest.fixture(autouse=True)
@@ -90,3 +106,93 @@ def test_task_ordering():
     scp_task = dag.get_task("scp_gold_db")
     downstream_ids = [t.task_id for t in scp_task.downstream_list]
     assert "swap_remote_db" in downstream_ids
+
+
+def test_swap_sends_the_shared_swap_command(monkeypatch):
+    """The DAG must delegate to swap_command, not hand-roll a command string."""
+    import dags.igh_deployment_dag as dep
+    from config.settings import config
+    from dags.igh_deploy_remote import swap_command
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
+
+    sent = {}
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent, stdout="retained-prev\n"))
+
+    result = dep.swap_remote_db()
+
+    assert sent["command"] == swap_command("/srv/dashboard/data")
+    assert result["status"] == "deployed"
+    assert result["retained_previous"] is True
+
+    # A first deploy retains nothing, and must not claim a rollback exists.
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent, stdout=""))
+    assert dep.swap_remote_db()["retained_previous"] is False
+
+    # Clause order documented at the DAG boundary. The chaining operators are
+    # deliberately not asserted: the guard's own `exit 1` is what stops the
+    # mutation, so swapping `&&` for `;` after it changes nothing (measured).
+    # What does matter is that `exit 1` staying there, and removing it IS
+    # caught -- test_swap_without_new_leaves_live_db_untouched runs the real
+    # command and sees star_schema.db.prev appear.
+    command = sent["command"]
+    guard = command.index("[ -f star_schema.db.new ]")
+    aside = command.index("ln -f star_schema.db star_schema.db.prev")
+    swap = command.index("mv -f star_schema.db.new star_schema.db")
+    assert guard < aside < swap
+
+
+def test_swap_skips_in_local_mode(monkeypatch):
+    import dags.igh_deployment_dag as dep
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "local")
+
+    def explode(*args, **kwargs):
+        raise AssertionError("run_remote must not be called in local mode")
+
+    monkeypatch.setattr(dep, "run_remote", explode)
+
+    assert dep.swap_remote_db() == {"status": "skipped", "reason": "local mode"}
+
+
+def test_deployment_allows_only_one_active_run():
+    """Concurrent deploys destroy the retained version.
+
+    Two interleaved runs can both pass the `.new` guard; the second's `ln`
+    then makes `.prev` and the live DB the same inode, after which rollback
+    fails with a coreutils "are the same file" error instead of either
+    designed message, and the operator cannot roll back until the next
+    deploy resets `.prev`.
+    """
+    from dags.igh_deployment_dag import dag
+
+    assert dag.max_active_runs == 1
+
+
+def test_swap_uses_the_current_config_after_a_settings_reload(monkeypatch):
+    """Reloading config.settings rebinds the singleton; the DAG must follow it.
+
+    is_local_mode() and validate_deploy_config() live in the helper and read
+    the fresh object. If this module kept a stale reference, those guards
+    would validate one config while swap_command() was built from another --
+    the boundary check would stop guarding the value actually used.
+    """
+    import importlib
+
+    import config.settings
+    import dags.igh_deployment_dag as dep
+
+    importlib.reload(config.settings)
+    fresh = config.settings.config
+    monkeypatch.setattr(fresh, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(fresh, "deploy_target_user", "deployer")
+    monkeypatch.setattr(fresh, "deploy_target_path", "/srv/after/reload")
+
+    sent = {}
+    monkeypatch.setattr(dep, "run_remote", _fake_run_remote(sent))
+    dep.swap_remote_db()
+
+    assert "/srv/after/reload" in sent["command"]

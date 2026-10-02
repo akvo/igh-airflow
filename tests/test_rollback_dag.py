@@ -1,0 +1,202 @@
+"""Tests for the IGH Rollback DAG."""
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_rollback_dag_module():
+    """Reload config and DAG modules after each test.
+
+    test_rollback_dag_is_manual_only reloads both modules with
+    DEPLOY_AUTO_TRIGGER set; monkeypatch restores the env var but does not
+    re-reload, so sys.modules would otherwise keep the patched module.
+    """
+    yield
+    import importlib
+    import os
+
+    import config.settings
+    import dags.igh_rollback_dag
+
+    os.environ.pop("DEPLOY_AUTO_TRIGGER", None)
+    importlib.reload(config.settings)
+    importlib.reload(dags.igh_rollback_dag)
+
+
+def test_dag_loads():
+    from dags.igh_rollback_dag import dag
+
+    assert dag is not None
+    assert dag.dag_id == "igh_rollback"
+
+
+def test_dag_has_correct_tags():
+    from dags.igh_rollback_dag import dag
+
+    assert "igh" in dag.tags
+    assert "rollback" in dag.tags
+
+
+def test_dag_has_one_task():
+    from dags.igh_rollback_dag import dag
+
+    assert [task.task_id for task in dag.tasks] == ["rollback_remote_db"]
+
+
+def test_rollback_dag_is_manual_only(monkeypatch):
+    """Review Focus 5: a gold build must never be able to trigger a rollback.
+
+    This DAG is written by following igh_deployment_dag's patterns, and that
+    DAG is Asset-scheduled when DEPLOY_AUTO_TRIGGER is set. Inheriting that
+    line here would auto-roll-back on every successful transform.
+    """
+    monkeypatch.setenv("DEPLOY_AUTO_TRIGGER", "true")
+    import importlib
+
+    import config.settings
+    import dags.igh_rollback_dag as rb
+
+    importlib.reload(config.settings)
+    importlib.reload(rb)
+
+    assert rb.dag.schedule is None
+
+
+def test_rollback_does_not_retry():
+    """Rollback is a deliberate act during an incident, not a retryable job."""
+    from dags.igh_rollback_dag import dag
+
+    assert dag.get_task("rollback_remote_db").retries == 0
+
+
+def test_rollback_sends_the_shared_rollback_command(monkeypatch):
+    import dags.igh_rollback_dag as rb
+    from config.settings import config
+    from dags.igh_deploy_remote import rollback_command
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
+
+    sent = {}
+    monkeypatch.setattr(rb, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+
+    result = rb.rollback_remote_db()
+
+    assert sent["command"] == rollback_command("/srv/dashboard/data")
+    assert result["status"] == "rolled_back"
+
+
+def test_rollback_skips_in_local_mode(monkeypatch):
+    import dags.igh_rollback_dag as rb
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "local")
+
+    def explode(*args, **kwargs):
+        raise AssertionError("run_remote must not be called in local mode")
+
+    monkeypatch.setattr(rb, "run_remote", explode)
+
+    assert rb.rollback_remote_db() == {"status": "skipped", "reason": "local mode"}
+
+
+def test_rollback_validates_deploy_config(monkeypatch):
+    import dags.igh_rollback_dag as rb
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "")
+    monkeypatch.setattr(config, "deploy_target_path", "")
+    monkeypatch.setattr(rb, "run_remote", lambda *a, **kw: None)
+
+    with pytest.raises(ValueError, match="DEPLOY_TARGET_USER"):
+        rb.rollback_remote_db()
+
+
+def test_rollback_uses_the_current_config_after_a_settings_reload(monkeypatch):
+    """Same reload-safety requirement as the deployment DAG."""
+    import importlib
+
+    import config.settings
+    import dags.igh_rollback_dag as rb
+
+    importlib.reload(config.settings)
+    fresh = config.settings.config
+    monkeypatch.setattr(fresh, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(fresh, "deploy_target_user", "deployer")
+    monkeypatch.setattr(fresh, "deploy_target_path", "/srv/after/reload")
+
+    sent = {}
+    monkeypatch.setattr(rb, "run_remote", lambda command, **kw: sent.setdefault("command", command))
+    rb.rollback_remote_db()
+
+    assert "/srv/after/reload" in sent["command"]
+
+
+def test_rollback_allows_only_one_active_run():
+    """Two concurrent rollbacks can both pass the `.prev` guard.
+
+    The state stays correct either way -- the second `mv` simply finds
+    nothing -- but the loser dies on a coreutils message rather than the
+    designed "no star_schema.db.prev to roll back to", which is the last
+    thing an operator needs mid-incident.
+    """
+    from dags.igh_rollback_dag import dag
+
+    assert dag.max_active_runs == 1
+
+
+def test_rollback_skips_when_there_is_nothing_to_roll_back(monkeypatch):
+    """A second rollback is a no-op, not a fault, so it must not go red.
+
+    Red means an engineer has something to fix. Having no previous version to
+    restore is the normal state after any rollback, and nothing can be done
+    about it until the next deploy -- so the task is skipped instead.
+
+    The exception class is taken off the DAG module rather than imported
+    directly: the DAG imports `igh_deploy_remote` unqualified while tests
+    import `dags.igh_deploy_remote`, which are two module objects holding two
+    distinct classes. Raising the one the DAG actually catches is the point.
+    """
+    from airflow.exceptions import AirflowSkipException
+
+    import dags.igh_rollback_dag as rb
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard")
+
+    def nothing_to_roll_back(command, **kwargs):
+        raise rb.RemoteCommandError(rb.NOTHING_TO_ROLL_BACK, "no star_schema.db.prev to roll back to")
+
+    monkeypatch.setattr(rb, "run_remote", nothing_to_roll_back)
+
+    with pytest.raises(AirflowSkipException, match="no previous version"):
+        rb.rollback_remote_db()
+
+
+def test_rollback_still_fails_on_a_real_remote_error(monkeypatch):
+    """The skip must be narrow: only the dedicated code, never anything else.
+
+    A broad `except RemoteCommandError` would turn an unreachable host or a
+    permission error into a green DAG run, which is the dangerous direction
+    of this change.
+    """
+    import dags.igh_rollback_dag as rb
+    from config.settings import config
+
+    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
+    monkeypatch.setattr(config, "deploy_target_user", "deployer")
+    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard")
+
+    def ssh_is_broken(command, **kwargs):
+        raise rb.RemoteCommandError(255, "ssh: connect to host dash.example.com port 22: Connection refused")
+
+    monkeypatch.setattr(rb, "run_remote", ssh_is_broken)
+
+    # AirflowSkipException is not a RemoteCommandError, so this also asserts
+    # the failure was not converted into a skip.
+    with pytest.raises(rb.RemoteCommandError, match="Connection refused"):
+        rb.rollback_remote_db()
