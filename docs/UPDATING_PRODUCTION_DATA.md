@@ -133,8 +133,12 @@ how it was before:
 
 Two things to know:
 
-- **It only goes back one step.** Running it a second time does nothing and
-  will show an error — that is expected, not a new problem.
+- **It only goes back one step.** If you run it a second time it does
+  nothing, and the job turns **grey/"skipped"** rather than red. That is the
+  job telling you there is no older version left to go back to — it is not a
+  problem, and there is nothing to fix.
+- **A red job is different.** If **4. IGH Rollback** turns red, something
+  actually went wrong. Tell engineering and do not retry it.
 - **It undoes the last deployment, not the last update.** Once you run a new
   update, the old version is replaced and is no longer available to go back
   to.

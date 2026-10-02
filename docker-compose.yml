@@ -244,11 +244,6 @@ services:
       # Public half of the keypair generated into ./ssh; installed as
       # authorized_keys at startup.
       - ${AIRFLOW_PROJ_DIR:-.}/ssh:/keys:ro
-    healthcheck:
-      test: ["CMD", "pgrep", "sshd"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
 
 volumes:
   postgres-db-volume:

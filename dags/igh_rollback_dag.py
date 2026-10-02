@@ -4,10 +4,11 @@ Manual-trigger only, and deliberately never Asset-scheduled: this DAG undoes
 a deployment, so nothing upstream should be able to fire it.
 
 It restores ``star_schema.db.prev``, which ``igh_deployment``'s swap task
-leaves behind. That consumes ``.prev``, so only one step back is available --
-a second rollback fails with a clear message and changes nothing. To roll
-forward again, trigger ``igh_deployment``, which re-uploads from the local
-gold database.
+leaves behind. That consumes ``.prev``, so only one step back is available.
+A second rollback changes nothing and is reported as a *skipped* task rather
+than a failure: there being nothing to undo is an expected state, not a fault
+for someone to fix. To roll forward again, trigger ``igh_deployment``, which
+re-uploads from the local gold database.
 """
 
 import sys
@@ -15,12 +16,20 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
+from airflow.exceptions import AirflowSkipException
 from airflow.providers.standard.operators.python import PythonOperator
 
 # Add project paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from igh_deploy_remote import is_local_mode, rollback_command, run_remote, validate_deploy_config
+from igh_deploy_remote import (
+    NOTHING_TO_ROLL_BACK,
+    RemoteCommandError,
+    is_local_mode,
+    rollback_command,
+    run_remote,
+    validate_deploy_config,
+)
 
 # Read settings through the module, never by holding the ``config`` object:
 # reloading ``config.settings`` rebinds the singleton, and the guards in
@@ -51,7 +60,27 @@ def rollback_remote_db(**context):
     validate_deploy_config()
 
     logger.info(f"Rolling back DB on {settings.config.deploy_target_host}")
-    run_remote(rollback_command(settings.config.deploy_target_path), timeout=60)
+    try:
+        run_remote(rollback_command(settings.config.deploy_target_path), timeout=60)
+    except RemoteCommandError as exc:
+        # Having nothing to roll back to is the normal state after any
+        # rollback, and nothing can change it until the next deploy. Failing
+        # red would tell the operator to go fix something that is not broken,
+        # so this one exit code becomes a skip. Every other code is a real
+        # failure -- an unreachable host, a permission problem -- and must
+        # stay red.
+        if exc.returncode != NOTHING_TO_ROLL_BACK:
+            raise
+        logger.warning(
+            "NO ROLLBACK PERFORMED: there is no previous version on %s to roll back to. "
+            "The live database is unchanged. Only one step back is kept, and it was "
+            "already used; the next deploy will retain a new one.",
+            settings.config.deploy_target_host,
+        )
+        raise AirflowSkipException(
+            "Nothing to roll back: no previous version is retained on "
+            f"{settings.config.deploy_target_host}. The live database is unchanged."
+        ) from exc
 
     logger.info("Rollback completed; star_schema.db.prev is now live and has been consumed")
     return {"status": "rolled_back", "host": settings.config.deploy_target_host}

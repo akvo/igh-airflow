@@ -92,8 +92,14 @@ version or immediately undo the rollback. `igh_deployment` is capped at one
 active run of its own (`max_active_runs=1`), but that cap does not span DAGs.
 
 Only one step back is available. The rollback consumes `.prev`, so a second
-rollback fails with `no star_schema.db.prev to roll back to` and changes
-nothing. To roll forward again, trigger `igh_deployment`, which re-uploads
+rollback changes nothing and is reported as a **skipped** task rather than a
+failed one, with `NO ROLLBACK PERFORMED` in the task log. A skipped task is
+not a problem to fix. Because a skip leaves the DAG run itself green, check
+the task tile rather than the run state when confirming whether a rollback
+actually happened.
+
+A **red** rollback means something else went wrong — an unreachable host, a
+permission problem — and does need attention. To roll forward again, trigger `igh_deployment`, which re-uploads
 from the local gold database.
 
 Disk: the deploy directory holds two gold databases at rest and three

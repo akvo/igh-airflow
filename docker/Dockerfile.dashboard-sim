@@ -13,24 +13,20 @@
 # whatever login shell the real dashboard server uses.
 FROM alpine:3
 
-# PermitEmptyPasswords defaults to no and password auth is disabled below, so
-# clearing the account lock is safe and keeps sshd from rejecting the account
-# outright on some builds.
+# `adduser -D` leaves the account password-locked (`deployer:!`), and sshd then
+# refuses it even for key auth -- measured: `!` gives "Permission denied
+# (publickey)", while `*` and an empty password both authenticate. `*` is used
+# rather than `passwd -d` because it means "no password login is possible", so
+# turning password auth on later still could not log in as this user.
 RUN apk add --no-cache openssh-server \
     && adduser -D -h /home/deployer deployer \
-    && passwd -d deployer \
+    && sed -i 's/^deployer:!/deployer:*/' /etc/shadow \
     && mkdir -p /srv/dashboard /home/deployer/.ssh \
     && chown -R deployer:deployer /srv/dashboard /home/deployer/.ssh \
     && chmod 700 /home/deployer/.ssh
 
-RUN printf '%s\n' \
-      '' \
-      '# dashboard-sim: key-based auth only' \
-      'PermitRootLogin no' \
-      'PasswordAuthentication no' \
-      'PermitEmptyPasswords no' \
-      'PubkeyAuthentication yes' \
-    >> /etc/ssh/sshd_config \
+# PermitEmptyPasswords is already off by default, so it is not repeated here.
+RUN printf '\nPermitRootLogin no\nPasswordAuthentication no\nPubkeyAuthentication yes\n' >> /etc/ssh/sshd_config \
     && ssh-keygen -A \
     && /usr/sbin/sshd -t
 

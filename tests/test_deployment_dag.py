@@ -110,29 +110,13 @@ def test_swap_sends_the_shared_swap_command(monkeypatch):
     assert sent["command"] == swap_command("/srv/dashboard/data")
     assert result["status"] == "deployed"
 
-
-def test_swap_checks_new_before_touching_the_live_db(monkeypatch):
-    """Review Focus 1, pinned at the DAG boundary too.
-
-    A future edit could reorder the command's clauses and still pass the
-    protocol tests by regenerating both sides, so assert the ordering here
-    against the literal filenames.
-    """
-    import dags.igh_deployment_dag as dep
-    from config.settings import config
-
-    monkeypatch.setattr(config, "deploy_target_host", "dash.example.com")
-    monkeypatch.setattr(config, "deploy_target_user", "deployer")
-    monkeypatch.setattr(config, "deploy_target_path", "/srv/dashboard/data")
-
-    sent = {}
-    monkeypatch.setattr(dep, "run_remote", lambda command, **kw: sent.setdefault("command", command))
-    dep.swap_remote_db()
-    command = sent["command"]
-
-    guard = command.index("[ -f star_schema.db.new ]")
-    aside = command.index("ln -f star_schema.db star_schema.db.prev")
-    swap = command.index("mv -f star_schema.db.new star_schema.db")
+    # The clause order is the safety property, so pin it at the DAG boundary
+    # too: regenerating both sides of the equality above would not catch a
+    # reordering. The executing test in test_deploy_remote.py is the stronger
+    # guard; this one costs three lines on setup that already exists.
+    guard = sent["command"].index("[ -f star_schema.db.new ]")
+    aside = sent["command"].index("ln -f star_schema.db star_schema.db.prev")
+    swap = sent["command"].index("mv -f star_schema.db.new star_schema.db")
     assert guard < aside < swap
 
 

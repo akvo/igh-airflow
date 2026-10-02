@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 
 from dags.igh_deploy_remote import (
+    NOTHING_TO_ROLL_BACK,
+    RemoteCommandError,
     is_local_mode,
     rollback_command,
     run_remote,
@@ -114,37 +116,55 @@ def test_rollback_restores_previous_and_consumes_prev(tmp_path):
     assert _state(tmp_path) == {"star_schema.db": "v1"}
 
 
-def test_rollback_without_prev_is_a_no_op(tmp_path):
-    """Review Focus 2: back-to-back rollbacks are impossible by construction."""
+def test_rollback_without_prev_exits_with_the_nothing_to_roll_back_code(tmp_path):
+    """Review Focus 2: back-to-back rollbacks are impossible by construction.
+
+    The exit code is load-bearing, not incidental: the DAG turns this specific
+    code into a skipped task rather than a red one, and treats every other
+    non-zero exit as a real failure. Exit 3 is unused by `mv` (1), `test`
+    (1 false / 2 error) and the shell itself (127, 128+n), so it cannot
+    collide with a genuine error.
+    """
     (tmp_path / "star_schema.db").write_text("v1")
     before = _state(tmp_path)
 
     rc, stderr = _run(rollback_command(tmp_path))
 
-    assert rc != 0
+    assert rc == NOTHING_TO_ROLL_BACK
     assert "no star_schema.db.prev" in stderr
     assert _state(tmp_path) == before
 
 
-def test_deploy_rollback_deploy_rollback_cycle(tmp_path):
-    """The full operational cycle from the spec's state table."""
-    (tmp_path / "star_schema.db.new").write_text("v1")
-    assert _run(swap_command(tmp_path))[0] == 0
+def test_swap_without_new_keeps_a_generic_failure_code(tmp_path):
+    """A missing .new stays a plain failure, deliberately unlike rollback.
 
+    Rollback having nothing to undo is an expected state. An upload that did
+    not land where it should have is anomalous and must stay red, so this
+    guard must not be "harmonized" onto the rollback's skip code.
+    """
+    (tmp_path / "star_schema.db").write_text("v1")
+
+    rc, _ = _run(swap_command(tmp_path))
+
+    assert rc == 1
+    assert rc != NOTHING_TO_ROLL_BACK
+
+
+def test_rolling_forward_after_a_rollback_re_establishes_prev(tmp_path):
+    """The one sequencing claim the single-step tests above do not cover.
+
+    After a rollback there is no `.prev`, so the next deploy has to create one
+    again -- otherwise rollback would be available only once per lifetime.
+    """
+    (tmp_path / "star_schema.db").write_text("v1")
     (tmp_path / "star_schema.db.new").write_text("v2")
-    assert _run(swap_command(tmp_path))[0] == 0
-    assert _state(tmp_path) == {"star_schema.db": "v2", "star_schema.db.prev": "v1"}
+    _run(swap_command(tmp_path))
+    _run(rollback_command(tmp_path))
 
-    assert _run(rollback_command(tmp_path))[0] == 0
-    assert _state(tmp_path) == {"star_schema.db": "v1"}
-
-    # Rolling forward is an ordinary deploy, which re-establishes .prev.
     (tmp_path / "star_schema.db.new").write_text("v3")
+
     assert _run(swap_command(tmp_path))[0] == 0
     assert _state(tmp_path) == {"star_schema.db": "v3", "star_schema.db.prev": "v1"}
-
-    assert _run(rollback_command(tmp_path))[0] == 0
-    assert _state(tmp_path) == {"star_schema.db": "v1"}
 
 
 def test_commands_quote_paths_containing_spaces(tmp_path):
@@ -202,6 +222,21 @@ def test_run_remote_raises_with_remote_stderr(monkeypatch):
 
     with pytest.raises(RuntimeError, match="no star_schema.db.prev to roll back to"):
         run_remote("false")
+
+
+def test_run_remote_error_carries_the_exit_code(monkeypatch):
+    """Callers branch on the exit code, so it must survive the raise."""
+
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, NOTHING_TO_ROLL_BACK, stdout="", stderr="nothing to do\n")
+
+    monkeypatch.setattr("dags.igh_deploy_remote.subprocess.run", fake_run)
+
+    with pytest.raises(RemoteCommandError) as exc:
+        run_remote("false")
+
+    assert exc.value.returncode == NOTHING_TO_ROLL_BACK
+    assert "nothing to do" in str(exc.value)
 
 
 def test_is_local_mode_for_dev_hosts(monkeypatch):

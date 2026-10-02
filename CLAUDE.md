@@ -115,7 +115,7 @@ What each step should produce:
 | Trigger `igh_deployment` (first time) | `star_schema.db` only — no `.prev` |
 | Change the gold DB, trigger again | live is the new version; `.prev` holds the old one **at the inode the live file had before** |
 | Trigger `igh_rollback` | live is the old version again, `.prev` gone |
-| Trigger `igh_rollback` a second time | task **fails**: `no star_schema.db.prev to roll back to`; directory unchanged |
+| Trigger `igh_rollback` a second time | task is **skipped** (not red), log says `NO ROLLBACK PERFORMED`; directory unchanged |
 | Clear only `swap_remote_db` and let it rerun | task **fails**: `no star_schema.db.new to deploy`; **live DB still intact** |
 
 That last row is the one worth re-running after any change to the swap
@@ -127,6 +127,11 @@ Two things that will trip you up:
 - The key must be readable by the container user. `.env` sets
   `AIRFLOW_UID=1000`; if that does not match the owner of `ssh/id_rsa`, `ssh`
   rejects the key.
+- Rebuilding `dashboard-sim` regenerates its SSH host keys, and the deploy
+  tasks use `StrictHostKeyChecking=accept-new`, which accepts an unknown host
+  but refuses a *changed* one. After a rebuild the tasks fail with `Host key
+  verification failed` until the worker's cached entry is dropped:
+  `docker compose up -d --force-recreate airflow-worker`.
 - `swap_remote_db` inherits `retries: 1` with a 5-minute delay, so a cleared
   swap task sits in `up_for_retry` for five minutes before it goes red. The
   failure itself is immediate — check the task log rather than waiting on the
@@ -207,10 +212,23 @@ hardlinks the outgoing `star_schema.db` to `star_schema.db.prev` before the
 atomic rename that publishes `star_schema.db.new`, and `igh_rollback`
 renames `.prev` back over the live file.
 
-Both commands check their precondition *before* mutating anything, so a
-swap with no `.new` (which is the state after every successful deploy) and a
-second rollback with no `.prev` both fail loudly and leave the directory
-untouched. Rolling forward after a rollback is an ordinary `igh_deployment`
+Both commands check their precondition *before* mutating anything, so
+neither can leave a half-applied state. They report differently on purpose:
+
+- A **second rollback** with no `.prev` is reported as a **skipped** task,
+  not a failure. Having nothing to undo is the normal state after any
+  rollback and cannot be fixed until the next deploy, so red would be telling
+  the operator to repair something that is not broken. The guard exits with
+  `NOTHING_TO_ROLL_BACK` (3) and the task logs `NO ROLLBACK PERFORMED`. Note
+  the *DAG run* still shows success — check the task tile, not the run.
+- A **swap** with no `.new` stays **red**. The upload not landing where it
+  should have is genuinely anomalous and worth an engineer's attention.
+
+Any other non-zero exit — unreachable host, permission denied — is red in
+both DAGs. The skip is matched on that one exit code alone, never on the
+error text.
+
+Rolling forward after a rollback is an ordinary `igh_deployment`
 run — the abandoned version is not retained remotely.
 
 To exercise this workflow for real without a remote machine, see

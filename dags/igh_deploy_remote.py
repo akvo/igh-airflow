@@ -33,6 +33,28 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+# Exit code ``rollback_command`` uses when there is no previous version to
+# restore. That is an expected state -- it is what every directory looks like
+# after a successful rollback -- so the rollback DAG turns this one code into a
+# skipped task rather than a red one, and treats every other non-zero exit as a
+# real failure. 3 is unused by ``mv`` (1), ``test`` (1 false / 2 error) and the
+# shell itself (127 not-found, 128+n signals), so it cannot collide with a
+# genuine error.
+NOTHING_TO_ROLL_BACK = 3
+
+
+class RemoteCommandError(RuntimeError):
+    """A command on the dashboard server exited non-zero.
+
+    Carries the exit code so callers can tell an expected precondition apart
+    from a real failure. Subclasses ``RuntimeError`` so existing callers that
+    only care that something went wrong keep working.
+    """
+
+    def __init__(self, returncode, stderr):
+        super().__init__(f"Remote command failed (rc={returncode}): {stderr}")
+        self.returncode = returncode
+
 
 def is_local_mode():
     """True when there is no real dashboard server to publish to (dev mode)."""
@@ -84,6 +106,9 @@ def rollback_command(remote_path):
     a second rollback fails its precondition and changes nothing -- that is
     the "one previous version" rule enforcing itself.
 
+    Exits ``NOTHING_TO_ROLL_BACK`` rather than 1 when there is no ``.prev``,
+    so the DAG can report that as a skip instead of a failure.
+
     Rolling forward again is an ordinary ``igh_deployment`` run. The
     abandoned version is deliberately not parked in ``.new``: it would make
     rerunning the deploy DAG's swap task silently re-promote the exact
@@ -92,7 +117,7 @@ def rollback_command(remote_path):
     p = shlex.quote(str(remote_path))
     return (
         f"cd {p} "
-        f'&& {{ [ -f star_schema.db.prev ] || {{ echo "no star_schema.db.prev to roll back to" >&2; exit 1; }}; }} '
+        f'&& {{ [ -f star_schema.db.prev ] || {{ echo "no star_schema.db.prev to roll back to" >&2; exit {NOTHING_TO_ROLL_BACK}; }}; }} '
         f"&& mv -f star_schema.db.prev star_schema.db"
     )
 
@@ -117,5 +142,5 @@ def run_remote(command, timeout=60):
     logger.info("Running on %s: %s", settings.config.deploy_target_host, command)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if result.returncode != 0:
-        raise RuntimeError(f"Remote command failed (rc={result.returncode}): {result.stderr.strip()}")
+        raise RemoteCommandError(result.returncode, result.stderr.strip())
     return result
