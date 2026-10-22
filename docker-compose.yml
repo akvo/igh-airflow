@@ -31,7 +31,7 @@ x-airflow-common: &airflow-common
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     # IGH deployment: "local" skips SCP/SSH in dev mode. Point DEPLOY_TARGET_HOST
     # at the dashboard-sim service to exercise the real deploy/rollback workflow
-    # against a throwaway SSH host -- see CLAUDE.md.
+    # against a throwaway SSH host -- see docs/SIMULATING_DASHBOARD_SERVER.md.
     DEPLOY_TARGET_HOST: ${DEPLOY_TARGET_HOST:-local}
     DEPLOY_TARGET_USER: ${DEPLOY_TARGET_USER:-}
     DEPLOY_TARGET_PATH: ${DEPLOY_TARGET_PATH:-}
