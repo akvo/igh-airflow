@@ -131,7 +131,7 @@ how it was before:
    way you started job 1.
 3. Wait for it to turn **dark green**, then check the dashboard again.
 
-Two things to know:
+Three things to know:
 
 - **It only goes back one step.** If you run it a second time it does
   nothing, and the job turns **grey/"skipped"** rather than red. That is the
@@ -142,6 +142,20 @@ Two things to know:
 - **It undoes the last deployment, not the last update.** Once you run a new
   update, the old version is replaced and is no longer available to go back
   to.
+
+### Putting the new data back after a rollback
+
+If it turns out the new data was fine after all, you can undo the rollback.
+You do **not** need to run the whole update again. Airflow still has the
+new data; the rollback only changed what the dashboard shows.
+
+1. **Tell engineering first**, the same as before a rollback.
+2. If they ask you to, open **3. IGH Deployment** and start it the same way
+   you started job 1. Do **not** start jobs 1 or 2.
+3. Wait for it to turn **dark green**, then check the dashboard again.
+
+This only brings back the data from your **last** update. If a new update
+was started after the rollback, job 3 delivers that newer data instead.
 
 ## If something goes wrong
 
