@@ -225,6 +225,12 @@ uv run ruff check --fix dags/ config/ tests/
 uv run ruff format dags/ config/ tests/
 ```
 
+### Testing Deploy and Rollback Locally
+
+The deploy and rollback DAGs do nothing in the default dev stack
+(`DEPLOY_TARGET_HOST=local`). To run them against a simulated dashboard
+server, see [Simulating the Dashboard Server](docs/SIMULATING_DASHBOARD_SERVER.md).
+
 ### Docker Commands
 
 ```bash
